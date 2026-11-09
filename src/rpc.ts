@@ -86,6 +86,33 @@ export function createReadOnlyRpc(fetcher: typeof fetch = fetch): RpcReader {
     return result.data;
   };
 }
+export interface RpcNetworkCheck {
+  state: 'MAINNET_REPORTED' | 'NOT_VERIFIED';
+  message: string;
+  observedAt: string;
+  headHeight?: number;
+  network?: string;
+  rpcUrl: string;
+}
+export async function checkPublicMainnetRpc(
+  rpc: RpcReader=createReadOnlyRpc(), nowMs=Date.now()
+):Promise<RpcNetworkCheck>{
+  const observedAt=new Date(nowMs).toISOString();
+  const base={observedAt,rpcUrl:PUBLIC_RPC};
+  try {
+    const consensus=await rpc('isConsensusEstablished',[]);
+    const latest=row(await rpc('getLatestBlock',[false]));
+    if(consensus!==true||!latest||!height(latest.number)||!networkIsMain(latest.network)||
+       typeof latest.timestamp!=='number'||!Number.isFinite(latest.timestamp)||
+       latest.timestamp>nowMs+120_000||nowMs-latest.timestamp>600_000){
+      return {...base,state:'NOT_VERIFIED',message:'RPC consensus, mainnet label or freshness was not independently established.'};
+    }
+    return {...base,state:'MAINNET_REPORTED',message:'One public RPC history node reports a recent MainAlbatross head and established consensus; wallet network and individual transactions remain unverified.',
+      headHeight:latest.number,network:String(latest.network)};
+  }catch(error){return {...base,state:'NOT_VERIFIED',
+    message:'RPC request failed (network, CORS or endpoint): '+(error instanceof Error?error.message:'Unknown error')};}
+}
+
 function result(state: VerifyState, message: string, inputHash: string, observedAt: string,
   network: VerifyResult['network']='UNVERIFIED', extras: Partial<VerifyResult>={}): VerifyResult {
   return {state,message,evidenceSource:'single-public-rpc',rpcUrl:PUBLIC_RPC,
