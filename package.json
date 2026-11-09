@@ -17,5 +17,10 @@
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   },
-  "engines": {"node": ">=22"}
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "rollup": "4.68.0"
+  }
 }
