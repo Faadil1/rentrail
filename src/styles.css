@@ -3,3 +3,18 @@
 @media(max-width:700px){.sidebar{display:none}.main-wrap{margin:0;width:100%}.topbar{height:65px;padding:0 18px}.mobile-brand{display:flex;align-items:center;gap:7px;font-family:Manrope;font-size:25px;font-weight:800;color:#283952}.mobile-brand>span{color:#4174f1}.mobile-brand small{font-size:15px;letter-spacing:-.6px}.topbar-caption{display:none}.topbar-right{gap:8px}.label-chip{display:none}.wallet-state{font-size:10px}.main-content{padding:22px 17px 110px}.welcome{padding:28px 22px;border-radius:17px}.welcome-symbol{display:none}.welcome h1{font-size:32px}.welcome p{font-size:12px}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0 29px}.metric:last-child{grid-column:span 2}.metric strong{font-size:28px}.metric{padding:18px 16px}.metric-foot{font-size:10px}.charge-row{gap:10px;padding:13px}.charge-avatar{height:37px;width:37px}.charge-title{max-width:34%}.charge-amount{margin-left:auto}.charge-amount strong{font-size:11px}.tiny{padding:7px}.tiny span{display:none}.mobile-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:20;box-shadow:0 -6px 24px #0c1e3814}.mobile-nav .nav-item{display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;border-radius:11px;padding:10px 3px;font-size:10px;color:#8ca0b9}.mobile-nav .nav-item.active{color:#2b63c6;background:#eff5ff}.mobile-nav .nav-item.active:before{display:none}.page-title h1{font-size:32px}.two-col{gap:18px}.panel{padding:19px}.section-heading h2{font-size:20px}.toast{left:16px;right:16px;bottom:83px}.checkout-value{font-size:39px}.tenant-shell .main-content{padding-bottom:40px}.demo-banner{font-size:10px;align-items:flex-start}}
 @media(max-width:365px){.charge-title{max-width:31%}.charge-amount strong{font-size:10px}.metric-top{font-size:11px}.wallet-state span:last-child{max-width:104px;overflow:hidden;text-overflow:ellipsis}}
 @media(prefers-reduced-motion:no-preference){button,.nav-item{transition:background .18s ease,transform .18s ease}}
+
+/* G3 independent RPC verification — deliberately restrained: a matching node report is not payment receipt. */
+.g3-panel{margin-top:22px;padding:clamp(18px,3vw,30px);border:1px solid var(--border,#d5d7da);background:var(--card,#fff);border-radius:18px;display:grid;gap:14px}
+.g3-panel h2{margin:0;font-size:clamp(1.3rem,3vw,1.8rem);line-height:1.18}
+.g3-panel>p{margin:0;line-height:1.5;max-width:70ch;color:var(--muted,#667085)}
+.g3-panel .form-card{box-shadow:none;border:1px solid var(--border,#d5d7da);border-radius:14px;padding:18px;display:grid;gap:13px;background:transparent}
+.g3-panel .form-card label{display:grid;gap:6px;min-width:0}
+.g3-panel select,.g3-panel input{width:100%;min-width:0;font:inherit;border:1px solid var(--border,#cfd4dd);border-radius:10px;padding:12px;background:var(--card,#fff);color:inherit}
+.g3-panel .form-hint{line-height:1.5}
+.g3-panel button{justify-self:start;max-width:100%}
+.g3-result{padding:14px 16px;border:1px solid #bac7d4;border-radius:12px;background:rgba(102,126,154,.08);overflow-wrap:anywhere}
+.g3-result strong{display:block;font-weight:750}
+.g3-result p{margin:8px 0}
+.g3-result small{display:block;overflow-wrap:anywhere;opacity:.8}
+@media(max-width:640px){.g3-panel{padding:18px 13px}.g3-panel .form-card{padding:13px}.g3-panel button{width:100%;justify-content:center}}
