@@ -179,6 +179,9 @@ function g3Panel(p:Portfolio):string {
   const charges = preview ? [] : p.charges;
   const options = charges.map(c=>`<option value="${escapeHtml(c.id)}" ${txChargeId===c.id?'selected':''}>${escapeHtml(c.period)} · ${formatNim(c.amountLuna)} NIM · ${escapeHtml(c.memo.slice(0,13))}…</option>`).join('');
   const networkResult=rpcNetwork ? `<div class="g3-result" role="status"><strong>${rpcNetwork.state==='MAINNET_REPORTED'?'Public RPC reports MainAlbatross':'RPC NOT VERIFIED'}</strong><p>${escapeHtml(rpcNetwork.message)}</p><small>${escapeHtml(rpcNetwork.observedAt)}${rpcNetwork.headHeight?' · Head '+rpcNetwork.headHeight:''}</small></div>` : '';
+  const heightWarning=rpcNetwork?.state==='MAINNET_REPORTED' && rpcNetwork.headHeight && check?.blockHeight!==null &&
+    check?.blockHeight!==undefined && Math.abs(rpcNetwork.headHeight-check.blockHeight)>10_000
+    ? '<div class="inline-alert">The wallet SDK block height differs greatly from this public mainnet node. The wallet may be on another network. Height alone does not establish network identity; do not send funds.</div>' : '';
   const txResult=txVerifyResult && txVerifiedChargeId===txChargeId ? `<div class="g3-result" id="g3-result" role="status"><strong>${txVerifyResult.state==='FINAL_MATCHED'?'Node-reported final match — NOT a rent receipt':escapeHtml(txVerifyResult.state.replaceAll('_',' '))}</strong><p>${escapeHtml(txVerifyResult.message)}</p><small>Tx ${escapeHtml(txVerifyResult.hash)} · ${escapeHtml(txVerifyResult.observedAt)}</small><p>Single public RPC only. No automatic rental ledger credit. Human recipient identity and agreement remain separate.</p></div>` : '';
   return `<section class="g3-panel" aria-label="Read-only mainnet verification">
     <div class="eyebrow">G3 · PUBLIC RPC · READ ONLY</div>
@@ -186,6 +189,7 @@ function g3Panel(p:Portfolio):string {
     <p>The provider detected by Nimiq Pay may be on TESTNET. This panel queries a separate public node reporting MainAlbatross. It cannot prove what network your wallet selected.</p>
     <button id="g3-network" class="tertiary" type="button" ${rpcChecking?'disabled':''}>${rpcChecking?'Checking public RPC…':'Check mainnet RPC connectivity'}</button>
     ${networkResult}
+    ${heightWarning}
     <form id="g3-verify-form" class="form-card">
       <label>Local rent obligation<select name="chargeId" required ${!charges.length||txVerifyBusy?'disabled':''}><option value="" ${!txChargeId?'selected':''}>Choose a charge…</option>${options}</select></label>
       <label>Transaction hash (64 hexadecimal characters)<input name="hash" type="text" inputmode="text" maxlength="64" pattern="[a-fA-F0-9]{64}" spellcheck="false" autocomplete="off" placeholder="Paste a real public NIM transaction hash" value="${escapeHtml(txHashInput)}" required ${txVerifyBusy?'disabled':''}/></label>
