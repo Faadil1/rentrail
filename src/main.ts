@@ -185,7 +185,7 @@ function tenantView(request:SharedRequest):string {
     <div class="consent-row"><label class="consent"><input id="ack-payment" type="checkbox" ${paymentAcknowledged?'checked':''}/> I independently verified the recipient and understand Nimiq Pay may be set to testnet or mainnet. A submitted transfer is not a verified rent receipt.</label></div>
     <button id="send-payment" class="primary full" type="button" ${!paymentAcknowledged||paymentBusy||outcomeUnknown||submittedHash?'disabled':''}>${paymentBusy?'Waiting for wallet…':submittedHash?'Submitted — not verified':outcomeUnknown?'Outcome unknown — check wallet':'Request NIM payment approval'} ${icon('arrow')}</button>
     <button class="tertiary full" id="tenant-check-host" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='connected'?'Recheck Nimiq Pay':'Check Nimiq Pay host'}</button>
-    <div class="checkout-status">${hostStatus==='connected' ? `Wallet bridge: detected · Consensus ${check?.consensus?'established':'not ready'}` : hostStatus==='error'?escapeHtml(hostMessage):'Wallet bridge not yet verified on this device.'}</div>
+    <div class="checkout-status">${hostMessage ? escapeHtml(hostMessage) : hostStatus==='connected' ? `Wallet bridge: detected · Consensus ${check?.consensus?'established':'not ready'}` : hostStatus==='error'?escapeHtml(hostMessage):'Wallet bridge not yet verified on this device.'}</div>
     ${submittedHash?`<div class="pending-result"><strong>Submitted, NOT verified as paid</strong><span class="mono">${escapeHtml(submittedHash)}</span><p>Check your wallet history. No independent finality/reconciliation has been performed in this build.</p></div>`:''}
     ${outcomeUnknown?`<div class="pending-result"><strong>Outcome unknown — DO NOT retry yet</strong><p>Inspect Nimiq Pay transaction history and independently verify on-chain before attempting another payment.</p></div>`:''}
   </div><p class="checkout-foot">RentRail is non-custodial. Payment approval happens inside Nimiq Pay, never in this page.</p></div>`;
@@ -253,6 +253,7 @@ async function onTenantPay():Promise<void>{
   try{
     const hash=await submitUserApprovedPayment(check.provider,tenantRequest);
     submittedHash=hash;
+    hostMessage='';
     try{localStorage.setItem(localPaymentKey(tenantRequest.chargeId),JSON.stringify({status:'SUBMITTED_UNVERIFIED',hash}));}catch{/* Storage may be blocked; user must retain wallet history. */}
     // Tenant view may belong to a different device; no synced settlement assertion.
     if(portfolio.charges.some(c=>c.id===tenantRequest?.chargeId)) {
