@@ -20,6 +20,9 @@
 | Live HTTPS deployment | **PREVIEW_READY + DEVICE_OPEN_OBSERVED** | Vercel deployment `dpl_8Ln14BaMAF4eUbTBfv8YYidHs1Ai`, target Preview, app SHA `af05d8a44d8ff2d00d676b07d262cc8841c3e45b`; URL https://rentrail-g1-preview-786i72h9q-faadil1s-projects.vercel.app; host SDK detected in user iPhone video |
 | Hackathon submission | NOT_SUBMITTED | Requires functioning app, mainnet and portal confirmation |
 
+
+**G3 deployed staging — 2026-11-09:** Vercel project `rentrail-g3-preview` (`prj_dO9xG2UgRm6MzYM8rlvNrw9K8azd`), **non-production target `staging`**, deployment `dpl_ARChMiRnDweBM4UgafuWx3rapG2Z`, **READY**, URL https://rentrail-g3-preview-equr4qxio-faadil1s-projects.vercel.app/ . Pinned source SHA `00d335c59a955f5218e8989932c6ac158360ef85`. `paymentEnabled=false` in exact deployed source. No G3 iPhone WebView recording yet. There was an earlier G3 project deployment `dpl_GQkdamVeP6AHcQTScKZvUgMmtBWr` that Vercel unexpectedly targeted as **production on this NEW ISOLATED project only**; it became READY before cancel could run. **It did not touch other Vercel projects or their production domains**, and is not the recommended G3 test URL. All payment sends are also disabled in this earlier deployed source. This staging deployment was created afterward explicitly to make the test environment unambiguous.
+
 ## Critical next gate
 1. **DONE:** GitHub Actions dependencies/tests/build green at deployed app SHA; **DONE for host injection:** actual iPhone Nimiq Pay SDK responded with consensus established and block height.
 2. **PENDING:** independently attest Nimiq mainnet network identity; chain is not identified from SDK consensus alone. Preserve video locally unless user approves public sharing.
