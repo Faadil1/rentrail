@@ -1,4 +1,5 @@
 import './styles.css';
+import { checkPublicMainnetRpc, verifyNimTransaction, type VerifyResult, type RpcNetworkCheck } from './rpc.ts';
 import {
   addCharge, addProperty, addUnit, createId, emptyPortfolio, formatNim, makeMemo,
   parseNim, projectCharge, recordSubmission, shareableRequest, validateSharedRequest,
@@ -17,6 +18,13 @@ let selectedView: View = 'overview';
 let check: HostCheck | null = null;
 let hostStatus: 'unchecked' | 'checking' | 'connected' | 'error' = 'unchecked';
 let hostMessage = '';
+let rpcChecking = false;
+let rpcNetwork: RpcNetworkCheck | null = null;
+let txVerifyBusy = false;
+let txVerifyResult: VerifyResult | null = null;
+let txHashInput = '';
+let txChargeId = '';
+let txVerifiedChargeId = '';
 let toast = '';
 let tenantRequest: SharedRequest | null = null;
 let tenantError = '';
@@ -167,6 +175,28 @@ function walletView():string {
   </div>
   <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>Only an explicit tenant payment click can request a native Nimiq Pay approval. We never read private keys or equate a returned hash with final settlement.</p></div></div>`;
 }
+function g3Panel(p:Portfolio):string {
+  const charges = preview ? [] : p.charges;
+  const options = charges.map(c=>`<option value="${escapeHtml(c.id)}" ${txChargeId===c.id?'selected':''}>${escapeHtml(c.period)} · ${formatNim(c.amountLuna)} NIM · ${escapeHtml(c.memo.slice(0,13))}…</option>`).join('');
+  const networkResult=rpcNetwork ? `<div class="g3-result" role="status"><strong>${rpcNetwork.state==='MAINNET_REPORTED'?'Public RPC reports MainAlbatross':'RPC NOT VERIFIED'}</strong><p>${escapeHtml(rpcNetwork.message)}</p><small>${escapeHtml(rpcNetwork.observedAt)}${rpcNetwork.headHeight?' · Head '+rpcNetwork.headHeight:''}</small></div>` : '';
+  const txResult=txVerifyResult && txVerifiedChargeId===txChargeId ? `<div class="g3-result" id="g3-result" role="status"><strong>${txVerifyResult.state==='FINAL_MATCHED'?'Node-reported final match — NOT a rent receipt':escapeHtml(txVerifyResult.state.replaceAll('_',' '))}</strong><p>${escapeHtml(txVerifyResult.message)}</p><small>Tx ${escapeHtml(txVerifyResult.hash)} · ${escapeHtml(txVerifyResult.observedAt)}</small><p>Single public RPC only. No automatic rental ledger credit. Human recipient identity and agreement remain separate.</p></div>` : '';
+  return `<section class="g3-panel" aria-label="Read-only mainnet verification">
+    <div class="eyebrow">G3 · PUBLIC RPC · READ ONLY</div>
+    <h2>Verify independently. <em>Never assume paid.</em></h2>
+    <p>The provider detected by Nimiq Pay may be on TESTNET. This panel queries a separate public node reporting MainAlbatross. It cannot prove what network your wallet selected.</p>
+    <button id="g3-network" class="tertiary" type="button" ${rpcChecking?'disabled':''}>${rpcChecking?'Checking public RPC…':'Check mainnet RPC connectivity'}</button>
+    ${networkResult}
+    <form id="g3-verify-form" class="form-card">
+      <label>Local rent obligation<select name="chargeId" required ${!charges.length||txVerifyBusy?'disabled':''}><option value="" ${!txChargeId?'selected':''}>Choose a charge…</option>${options}</select></label>
+      <label>Transaction hash (64 hexadecimal characters)<input name="hash" type="text" inputmode="text" maxlength="64" pattern="[a-fA-F0-9]{64}" spellcheck="false" autocomplete="off" placeholder="Paste a real public NIM transaction hash" value="${escapeHtml(txHashInput)}" required ${txVerifyBusy?'disabled':''}/></label>
+      <p class="form-hint">Exact recipient, amount, opaque memo, chain execution, canonical block inclusion and a later macroblock are required. One-node results are informational and do not settle a lease.</p>
+      <button class="primary" type="submit" ${!charges.length||preview||txVerifyBusy?'disabled':''}>${txVerifyBusy?'Verifying…':'Read chain and verify tuple'} ${icon('arrow')}</button>
+    </form>
+    ${!charges.length?'<div class="inline-alert">Create an actual local rent obligation before checking a transaction. Fictional example charges are never verified as real.</div>':''}
+    ${txResult}
+    <div class="safety"><span>${icon('shield')}</span><div><strong>Payment sends remain locked.</strong><p>Nothing here sends NIM, stores wallet secrets, or marks rent paid automatically.</p></div></div>
+  </section>`;
+}
 function encodeRequest(r:SharedRequest):string {
   const text=JSON.stringify(r);
   return btoa(text).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
@@ -194,7 +224,7 @@ function tenantView(request:SharedRequest):string {
 }
 function render():void {
   const p=activePortfolio();
-  const content=tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),wallet:walletView()})[selectedView];
+  const content=tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),wallet:walletView() + g3Panel(p)})[selectedView];
   root!.innerHTML=`<div class="app-shell ${tenantRequest?'tenant-shell':''}">
     <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>WORKING NAME</small></span></a>
       <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('wallet','Wallet gate','wallet')}</nav>
@@ -237,10 +267,38 @@ function bindEvents():void {
     try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url.toString());success('Payment-request link copied. Verify recipient with the other party.');}else{window.prompt('Copy this payment-request link',url.toString());success('Request link shown for copying.');}}
     catch{window.prompt('Copy this payment-request link',url.toString());}
   }));
+  root!.querySelector('#g3-network')?.addEventListener('click',()=>void onRpcCheck());
+  const g3Form=root!.querySelector<HTMLFormElement>('#g3-verify-form');
+  g3Form?.addEventListener('submit',e=>{e.preventDefault();void onVerifyG3(g3Form);});
+  g3Form?.addEventListener('input',()=>{txVerifyResult=null;const card=root!.querySelector('#g3-result');if(card)card.textContent='Parameters changed. Verify the new transaction hash before trusting prior results.';});
   root!.querySelector('#check-host')?.addEventListener('click',()=>void onHostCheck());
   root!.querySelector('#tenant-check-host')?.addEventListener('click',()=>void onHostCheck());
   root!.querySelector<HTMLInputElement>('#ack-payment')?.addEventListener('change',e=>{paymentAcknowledged=(e.target as HTMLInputElement).checked;render();});
   root!.querySelector('#send-payment')?.addEventListener('click',()=>void onTenantPay());
+}
+async function onRpcCheck():Promise<void>{
+  if(rpcChecking)return;
+  rpcChecking=true;rpcNetwork=null;render();
+  try{rpcNetwork=await checkPublicMainnetRpc();}
+  catch{rpcNetwork={state:'NOT_VERIFIED',message:'Public RPC request failed; no chain proof.',observedAt:new Date().toISOString(),rpcUrl:'https://rpc.nimiqwatch.com/'};}
+  finally{rpcChecking=false;render();}
+}
+async function onVerifyG3(form:HTMLFormElement):Promise<void>{
+  if(txVerifyBusy||preview)return;
+  txChargeId=formValue(form,'chargeId');
+  txHashInput=formValue(form,'hash');
+  txVerifyResult=null;
+  const charge=portfolio.charges.find(c=>c.id===txChargeId);
+  if(!charge){error('Unknown local obligation.');return;}
+  txVerifyBusy=true;render();
+  try{
+    const result=await verifyNimTransaction({hash:txHashInput,recipient:charge.recipient,memo:charge.memo,amountLuna:charge.amountLuna,allowPartial:true});
+    txVerifyResult=result;
+    txVerifiedChargeId=charge.id;
+  }catch{
+    txVerifyResult=null;
+    error('Unable to verify. No payment has been credited.');
+  }finally{txVerifyBusy=false;render();}
 }
 async function onHostCheck():Promise<void>{
   hostStatus='checking';hostMessage='';render();
