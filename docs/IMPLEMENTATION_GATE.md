@@ -2,6 +2,8 @@
 
 **Branch:** `feat/rent-ledger-host-v1` (separate from documentation PR #1). The name RentRail is provisional.
 
+**G1 HTTPS preview — evidence:** Vercel ID `dpl_8Ln14BaMAF4eUbTBfv8YYidHs1Ai`, READY, preview target (`target: null` in deployment record), same branch's app SHA `af05d8a44d8ff2d00d676b07d262cc8841c3e45b`, HTTPS URL `https://rentrail-g1-preview-786i72h9q-faadil1s-projects.vercel.app`. Hosted source has `paymentEnabled = false`; no NIM send can be triggered through the hosted UI. Vercel SSO/password protection disabled for native in-app access. Device SDK injection remains unverified. Project `rentrail-g1-preview` uses manual file-source Preview deployment, not automatic Git branch deploy. There was an earlier incorrectly targeted deployment `dpl_S2DfmyNB2kZb5wfevTAaQRyqNfoe`; it was canceled before READY and is not the active site.
+
 | Area | State | Evidence/next action |
 |---|---|---|
 | Mobile UI routes | CODE_WRITTEN | Dashboard, properties, period charges, tenant link, SDK gate |
@@ -13,7 +15,7 @@
 | Independent transaction finality | NOT_IMPLEMENTED | No PAID result may be shown |
 | Shared private backend / authentication | NOT_IMPLEMENTED | Local data only; link can be altered |
 | Real product end-to-end | NOT_VERIFIED | Device + actual chain + user evidence missing |
-| Live HTTPS deployment | NOT_DONE | Preview recommended if local URL rejected |
+| Live HTTPS deployment | PREVIEW_READY | Vercel deployment `dpl_8Ln14BaMAF4eUbTBfv8YYidHs1Ai` on 2026-11-09, target preview (no production), pinned to app SHA `af05d8a44d8ff2d00d676b07d262cc8841c3e45b`; public URL https://rentrail-g1-preview-786i72h9q-faadil1s-projects.vercel.app; not yet observed inside Nimiq Pay |
 | Hackathon submission | NOT_SUBMITTED | Requires functioning app, mainnet and portal confirmation |
 
 ## Critical next gate
