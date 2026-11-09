@@ -20,6 +20,8 @@ let hostMessage = '';
 let toast = '';
 let tenantRequest: SharedRequest | null = null;
 let tenantError = '';
+// Preview is host-connection-only. Never send NIM until a reviewed verifier and human gate exist.
+const paymentEnabled = false;
 let paymentBusy = false;
 let paymentAcknowledged = false;
 let submittedHash: string | null = null;
@@ -183,7 +185,7 @@ function tenantView(request:SharedRequest):string {
     <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(request.chargeId.slice(0,10))}…</strong></div>
     <div class="inline-alert">${icon('alert')} Link contents can be altered by anyone sharing it. Verify the recipient with your landlord independently. This request does not prove identity or a legal debt.</div>
     <div class="consent-row"><label class="consent"><input id="ack-payment" type="checkbox" ${paymentAcknowledged?'checked':''}/> I independently verified the recipient and understand Nimiq Pay may be set to testnet or mainnet. A submitted transfer is not a verified rent receipt.</label></div>
-    <button id="send-payment" class="primary full" type="button" ${!paymentAcknowledged||paymentBusy||outcomeUnknown||submittedHash?'disabled':''}>${paymentBusy?'Waiting for wallet…':submittedHash?'Submitted — not verified':outcomeUnknown?'Outcome unknown — check wallet':'Request NIM payment approval'} ${icon('arrow')}</button>
+    <button id="send-payment" class="primary full" type="button" ${!paymentEnabled||!paymentAcknowledged||paymentBusy||outcomeUnknown||submittedHash?'disabled':''}>${!paymentEnabled?'Payments locked — host test only':paymentBusy?'Waiting for wallet…':submittedHash?'Submitted — not verified':outcomeUnknown?'Outcome unknown — check wallet':'Request NIM payment approval'} ${icon('arrow')}</button>
     <button class="tertiary full" id="tenant-check-host" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='connected'?'Recheck Nimiq Pay':'Check Nimiq Pay host'}</button>
     <div class="checkout-status">${hostMessage ? escapeHtml(hostMessage) : hostStatus==='connected' ? `Wallet bridge: detected · Consensus ${check?.consensus?'established':'not ready'}` : hostStatus==='error'?escapeHtml(hostMessage):'Wallet bridge not yet verified on this device.'}</div>
     ${submittedHash?`<div class="pending-result"><strong>Submitted, NOT verified as paid</strong><span class="mono">${escapeHtml(submittedHash)}</span><p>Check your wallet history. No independent finality/reconciliation has been performed in this build.</p></div>`:''}
@@ -247,7 +249,7 @@ async function onHostCheck():Promise<void>{
   render();
 }
 async function onTenantPay():Promise<void>{
-  if(!tenantRequest||!paymentAcknowledged||paymentBusy||submittedHash||outcomeUnknown)return;
+  if(!paymentEnabled||!tenantRequest||!paymentAcknowledged||paymentBusy||submittedHash||outcomeUnknown)return;
   if(!check||hostStatus!=='connected'||!check.consensus){error('Check Nimiq Pay host and established consensus before requesting wallet approval.');return;}
   paymentBusy=true;render();
   try{
