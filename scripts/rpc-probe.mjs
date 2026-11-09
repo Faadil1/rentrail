@@ -23,5 +23,36 @@ try{
   probeFrom:probeAt,macroHeight:next,
   macro:macro&&typeof macro==='object'?{keys:Object.keys(macro),number:macro.number,type:macro.type,network:macro.network,hash:macro.hash}:macro
  };
+ // Browser/CORS visibility: a successful server fetch does NOT prove the iPhone WebView can call RPC.
+ try {
+   const opt=await fetch(endpoint,{method:'OPTIONS',headers:{
+     'Origin':'https://rentrail-g1-preview-786i72h9q-faadil1s-projects.vercel.app',
+     'Access-Control-Request-Method':'POST',
+     'Access-Control-Request-Headers':'content-type',
+   },signal:AbortSignal.timeout(6000)});
+   out.cors={status:opt.status,allowOrigin:opt.headers.get('access-control-allow-origin'),
+     allowHeaders:opt.headers.get('access-control-allow-headers'),
+     allowMethods:opt.headers.get('access-control-allow-methods')};
+ } catch(error){out.cors={state:'NOT_OBSERVED',reason:error?.message||String(error)};}
+ // Check a real PUBLIC transaction's field SHAPE only; never credit it to a rental charge.
+ let sample=null;
+ for(const offset of [2,5,10,15,20,25,30,35,40,45]){
+   try{
+     const txs=await rpc('getTransactionsByBlockNumber',[Math.max(1,head.number-offset)]);
+     if(!Array.isArray(txs)||!txs.length)continue;
+     const first=txs.find(x=>x&&typeof x==='object'&&/^[a-f0-9]{64}$/i.test(x.hash||''));
+     if(!first)continue;
+     const tx=await rpc('getTransactionByHash',[first.hash]);
+     if(!tx||typeof tx!=='object')continue;
+     sample={blockRequested:head.number-offset,listCount:txs.length,keys:Object.keys(tx),
+       hashPresent:typeof tx.hash==='string',blockNumber:tx.blockNumber,
+       networkId:tx.networkId,executionResult:tx.executionResult,
+       recipientDataType:typeof tx.recipientData,
+       recipientDataHexLike:typeof tx.recipientData==='string'&&/^[0-9a-f]*$/i.test(tx.recipientData),
+       valueType:typeof tx.value};
+     break;
+   }catch(error){sample={state:'NOT_OBSERVED',reason:error?.message||String(error)};break;}
+ }
+ out.publicTransactionShape=sample||{state:'NOT_OBSERVED',reason:'No transactions observed in limited read-only sample'};
  console.log(JSON.stringify(out,null,2));
 }catch(error){console.error('G3 RPC probe NOT_VERIFIED:',error?.message||String(error));process.exitCode=1;}
