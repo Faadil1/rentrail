@@ -41,3 +41,6 @@ test('real money not acknowledged denies',()=>rejected({realMoneyAcknowledged:fa
 test('wallet native confirmation not acknowledged denies',()=>rejected({walletApprovalAcknowledged:false}));
 test('unresolved prior attempt denies',()=>rejected({priorAttemptUnresolved:true}));
 test('no wallet-only consensus fallback',()=>rejected({publicRpcObservedAt:null}));
+test('missing build recipient allowlist prevents sending',()=>rejected({allowlistedRecipient:null}));
+test('recipient that differs from allowlist prevents sending',()=>rejected({allowlistedRecipient:'NQ01 1111 1111 1111 1111 1111 1111 1111 1111'}));
+test('allowlist compares normalized addresses',()=>assert.equal(assessSmokePayment(ready({allowlistedRecipient:'nq0700000000000000000000000000000000'})).allowed,true));
