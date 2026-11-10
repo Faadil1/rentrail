@@ -1,6 +1,6 @@
 import {
   addCharge, assertPeriod, makeMemo, projectCharge,
-  type Portfolio, type Charge, type ChargeViewStatus,
+  type Portfolio, type Charge, type ChargeViewStatus, type Reconciliation,
 } from './domain.ts';
 
 export interface MonthLine {
@@ -67,8 +67,9 @@ export function planNextPeriod(
 /**
  * Trust note: snapshot summarizes local off-chain obligations and unverified wallet sends,
  * never an independent claim about cash received or legal rent payment.
+ * Optional fresh node-reported projections are derived in memory; never persisted.
  */
-export function monthSnapshot(p:Portfolio, period:string, propertyId=''):MonthSnapshot {
+export function monthSnapshot(p:Portfolio, period:string, propertyId='',live?:Record<string,Reconciliation>):MonthSnapshot {
   assertPeriod(period);
   if(propertyId && !p.properties.some(x=>x.id===propertyId))throw Error('Unknown property filter.');
   const units=p.units.filter(u=>!propertyId||u.propertyId===propertyId);
@@ -78,7 +79,7 @@ export function monthSnapshot(p:Portfolio, period:string, propertyId=''):MonthSn
   const lines:MonthLine[]=selected.map(charge=>{
     if(!Number.isSafeInteger(expectedLuna+charge.amountLuna))throw Error('Portfolio amount exceeds safe integer precision.');
     expectedLuna+=charge.amountLuna;
-    const projection=projectCharge(charge,[],p.submissions);
+    const projection=live?.[charge.id] ?? projectCharge(charge,[],p.submissions);
     // No rent is credited without independent verified evidence.
     if(!Number.isSafeInteger(outstandingLuna+projection.dueLuna))throw Error('Outstanding amount exceeds safe integer precision.');
     outstandingLuna+=projection.dueLuna;
