@@ -152,8 +152,9 @@ function overview(p: Portfolio): string {
     <div class="safety"><span>${icon('shield')}</span><div><strong>Designed to show what is proven.</strong><p>Sending a transaction never marks an obligation as paid. Independent mainnet reconciliation is a separate required gate.</p></div></div>`;
 }
 function periodCockpit(p:Portfolio):string {
-  const snap=monthSnapshot(p,workspaceMonth,filterProperty);
-  const options=p.properties.map(x=>`<option value="${escapeHtml(x.id)}" ${filterProperty===x.id?'selected':''}>${escapeHtml(x.name)}</option>`).join('');
+  const activeFilter=p.properties.some(x=>x.id===filterProperty)?filterProperty:'';
+  const snap=monthSnapshot(p,workspaceMonth,activeFilter);
+  const options=p.properties.map(x=>`<option value="${escapeHtml(x.id)}" ${activeFilter===x.id?'selected':''}>${escapeHtml(x.name)}</option>`).join('');
   const monthlyLines=snap.lines.slice(0,8).map(line=>`<div class="period-line">
     <div><strong>${escapeHtml(line.unitLabel)}</strong><small>${escapeHtml(line.propertyName)}</small></div>
     <div><strong>${formatNim(line.outstandingLuna)} NIM</strong><small>${line.status==='SUBMITTED_UNVERIFIED'?'Wallet send unverified':'Local obligation; no verified payment'}</small></div></div>`).join('');
@@ -180,6 +181,7 @@ function renewalPlanner(p:Portfolio):string {
     <div class="eyebrow">REPEAT VALUE · RENTAL CYCLE</div>
     <h2>Prepare the next month</h2>
     <p>Carry forward the amounts and receiving addresses for ${escapeHtml(workspaceMonth)} into ${escapeHtml(next)}. Each new invoice receives a <strong>new opaque public reference</strong>. No payment or reminder is sent.</p>
+    <div class="period-filters"><label>Source month<input id="renewal-month" type="month" value="${escapeHtml(workspaceMonth)}"/></label></div>
     <div class="renewal-stats"><strong>${eligible.length}</strong> invoice${eligible.length===1?'':'s'} eligible · ${source.length-eligible.length} already planned for ${escapeHtml(next)}</div>
     <div class="renewal-actions">
       <button id="preview-renewal" class="tertiary" type="button" ${preview||eligible.length===0?'disabled':''}>Review invoices</button>
@@ -227,7 +229,7 @@ function walletView():string {
   ${hostStatus==='error'?`<div class="inline-alert">${icon('alert')} ${escapeHtml(hostMessage)}</div>`:''}
   ${hostStatus==='connected'?`<div class="host-report"><div><span>Host provider</span><b>Detected</b></div><div><span>Consensus</span><b>${check?.consensus?'Established':'Unavailable'}</b></div><div><span>Block height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>Balance method</span><b>${check?.balanceReadAvailable?'Available':'Missing / old host'}</b></div><div><span>Mainnet attested</span><b>No — separate RPC gate</b></div></div>`:''}
   </div>
-  <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>Only an explicit tenant payment click can request a native Nimiq Pay approval. We never read private keys or equate a returned hash with final settlement.</p></div></div>`;
+  <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>This Preview cannot initiate a wallet payment. A future explicitly approved payment flow will require native Nimiq Pay confirmation. We never request private keys or equate a hash with final settlement.</p></div></div>`;
 }
 function g3Panel(p:Portfolio):string {
   const charges = preview ? [] : p.charges;
@@ -309,7 +311,7 @@ function independentAuditView(audit:PublicPaymentAudit):string {
     <div class="detail"><span>Transaction to check</span><strong class="mono">${escapeHtml(audit.txHash)}</strong></div>
     <button id="audit-recheck" class="primary full" ${publicAuditBusy?'disabled':''} type="button">${publicAuditBusy?'Checking public RPC…':'Recheck blockchain independently'} ${icon('arrow')}</button>
     ${status}
-    <div class="inline-alert">This public link is **not digitally signed** and can be modified. Confirm recipient ownership with the landlord independently. A blockchain match is not proof that a legal rental obligation is discharged.</div>
+    <div class="inline-alert">This public link is <strong>not digitally signed</strong> and can be modified. Confirm recipient ownership with the landlord independently. A blockchain match is not proof that a legal rental obligation is discharged.</div>
     <a class="tertiary" href="/">Back to RentRail</a>
   </section></div>`;
 }
@@ -358,11 +360,11 @@ function bindEvents():void {
     try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url.toString());success('Payment-request link copied. Verify recipient with the other party.');}else{window.prompt('Copy this payment-request link',url.toString());success('Request link shown for copying.');}}
     catch{window.prompt('Copy this payment-request link',url.toString());}
   }));
-  root!.querySelector<HTMLInputElement>('#month-filter')?.addEventListener('change',e=>{
+  root!.querySelectorAll<HTMLInputElement>('#month-filter, #renewal-month').forEach(input=>input.addEventListener('change',e=>{
     const month=(e.target as HTMLInputElement).value;
     if(!/^\\d{4}-(0[1-9]|1[0-2])$/.test(month))return;
     workspaceMonth=month;nextPeriodPreview=null;render();
-  });
+  }));
   root!.querySelector<HTMLSelectElement>('#property-filter')?.addEventListener('change',e=>{
     filterProperty=(e.target as HTMLSelectElement).value;render();
   });
