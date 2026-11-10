@@ -10,7 +10,12 @@
 - URL: https://rentrail-operations-staging-3gny1uerl-faadil1s-projects.vercel.app/
 - Real SDK dependency + strict network check compile at that SHA. GitHub Actions `42749087224`: **156/156 tests PASS**, TypeScript/Vite build PASS.
 - Payment build flag **NOT SET** and approved recipient address **NOT SET**, so the staged app is read-only. No real native wallet transfer is initiated or enabled by this deployment.
-- G2 iPhone evidence of host-reported network and public RPC reachability on this exact version: **NOT_OBSERVED**. Captures are private unless their owner explicitly permits publication.
+- G2 iPhone evidence: **OBSERVED** in user-provided 26-second private video captured on 2026-11-09 at 23:39 EST (2026-11-10 04:39 UTC). The deployed Mini App renders inside Nimiq Pay. **SDK provider detected**, **consensus established**, **host-reported network TESTNET**, **SDK height 16,369,009**, balance read available. `Check mainnet RPC connectivity` returns **MAINNET_REPORTED** from the public node, `MainAlbatross`, head **66,499,692**, at **2026-11-10T04:39:10.703Z**. App explicitly displays the height-disagreement warning. This is a correct safety-stop (wallet testnet != public RPC mainnet); **wallet mainnet alignment: NOT VERIFIED**. No payment, transaction hash or rent evidence was observed. Capture remains private; no screenshot uploaded to the public repo.
+
+## Correct immediate next step — no money transfer
+1. Option A (safe development): remain on TESTNET for UI and wallet behavior. This project's current verification RPC is **mainnet-only**, so do not use it to claim testnet transaction finality. A separate verified testnet RPC is needed for fully matched testnet flow.
+2. Option B (read-only mainnet connectivity check, not payment authorization): in Nimiq Pay app menu, long-press the **Settings** button ~10 seconds to reveal the development menu; select **Mainnet**. Nimiq's official docs warn that switching reloads the app and clears its displayed transaction history. Confirm user consent before switching. Reopen this staging URL → Wallet gate → Check host → Check mainnet RPC connectivity. Stop if wallet does not explicitly report MAINNET or if heights differ significantly. **Do not create or authorize a transaction.**
+3. Official source: https://nimiq.dev/mini-apps/development/load-local-mini-app (testnet switch), https://nimiq.dev/mini-apps/faq (competition cannot submit testnet-only app).
 
 ## What changed
 - Import `getHostNetwork()` from `@nimiq/mini-app-sdk` >=0.2.4. Host explicitly reports `mainnet`, `testnet` or `unknown`; **no fallback** to mainnet.
@@ -46,8 +51,9 @@ An intentionally tiny, allowlisted **smoke-test flow is NOT the finished rent-pa
 ## Current truth
 - Build-time flag: **OFF** in all normal deployments.
 - Allowlisted address: **NOT PROVIDED / NOT APPROVED**.
-- Native Nimiq Pay host network on iPhone: **NOT YET OBSERVED** with new SDK.
-- Public RPC read from actual iOS WebView: **NOT YET OBSERVED**.
+- Native Nimiq Pay network on iPhone: **TESTNET observed** in this exact staging (not mainnet).
+- Public RPC read from actual Nimiq Pay iOS WebView: **PASS** for independent node's reported `MainAlbatross` head; **does not establish that the wallet is on mainnet**.
+- G2 network alignment: **BLOCKED** until host explicitly reports MAINNET and heights are comparable.
 - Real NIM value transfer: **NOT PERFORMED**.
 - Rent transaction finality: **NOT VERIFIED**.
 - Submission dashboard: **NOT SUBMITTED**.
