@@ -277,13 +277,13 @@ function portableWorkspacePanel(p:Portfolio):string {
    <h3>Keep your rental records across devices</h3>
    <p>Export your local property, unit, monthly charge and unverified-submission records as JSON. Import on another device after reviewing the counts. This is <strong>not a live sync</strong>, not an attested on-chain receipt, and not encrypted. Store copies privately.</p>
    <div class="portable-metrics"><span><b>${counts.properties}</b> properties</span><span><b>${counts.units}</b> units</span><span><b>${counts.charges}</b> charges</span><span><b>${counts.unverified}</b> unverified sends</span></div>
-   <button type="button" id="workspace-export" class="tertiary" ${preview?'disabled':''}>Export JSON backup</button>
+   <button type="button" id="workspace-export" class="tertiary" ${preview?'disabled':''}>Export JSON backup (including node observations)</button>
    <form id="workspace-import" class="form-stack">
      <label>Restore JSON backup<textarea name="backup" rows="3" maxlength="200000" spellcheck="false" autocomplete="off" placeholder="Paste a RentRail workspace JSON export" required></textarea></label>
      <button type="submit" class="tertiary" ${preview?'disabled':''}>Preview import — no changes yet</button>
    </form>
    ${importError?`<div class="inline-alert" role="alert">${escapeHtml(importError)}</div>`:''}
-   ${restore?`<div class="import-preview" role="status"><b>Valid workspace snapshot</b><p>${restore.properties} properties · ${restore.units} units · ${restore.charges} rent charges · ${restore.unverified} unverified submissions</p><p>Imported hashes and statuses are never legal payment receipts. Reverify each on-chain transaction independently. Import replaces this device's current local workspace, never merges it.</p><label class="consent"><input type="checkbox" id="restore-ack"> I understand this replaces existing local records and is not proof of payment.</label><button type="button" id="workspace-apply" class="primary" disabled>Replace local workspace with preview</button></div>`:''}
+   ${restore?`<div class="import-preview" role="status"><b>Valid workspace snapshot</b><p>${restore.properties} properties · ${restore.units} units · ${restore.charges} rent charges · ${restore.unverified} unverified submissions · ${importCandidate?.casebook?.entries.length??0} historic RPC observations</p><p>Imported hashes and statuses are never legal payment receipts. Reverify each on-chain transaction independently. Import replaces this device's current local workspace, never merges it.</p><label class="consent"><input type="checkbox" id="restore-ack"> I understand this replaces existing local records and is not proof of payment.</label><button type="button" id="workspace-apply" class="primary" disabled>Replace local workspace with preview</button></div>`:''}
  </section>`;
 }
 function chargesView(p:Portfolio):string {
@@ -511,7 +511,10 @@ function bindEvents():void {
     try{
       // Revalidate before write, never merge imported wallet status with our browser.
       const validated=readWorkspaceBackup(JSON.stringify(importCandidate));
-      savePortfolio(validated.portfolio);portfolio=validated.portfolio;
+      savePortfolio(validated.portfolio);
+      // Never attach earlier local proof observations to an imported workspace.
+      persistCasebook(validated.casebook??{version:1,entries:[]},validated.portfolio);
+      portfolio=validated.portfolio;
       importCandidate=null;importError='';success('Workspace restored locally. Reverify past transfer hashes against mainnet.');
     }catch(err){importError=err instanceof Error?err.message:'Restore failed';render();}
   });
@@ -599,7 +602,7 @@ function bindEvents():void {
 async function onWorkspaceExport():Promise<void>{
  if(preview)return;
  try{
-   const json=createWorkspaceBackup(portfolio);
+   const json=createWorkspaceBackup(portfolio,new Date().toISOString(),loadCasebook(portfolio));
    if(navigator.clipboard?.writeText){
      await navigator.clipboard.writeText(json);
      success('Backup JSON copied. Keep it private; it contains property labels and public receiving addresses.');
