@@ -1,6 +1,7 @@
 import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
+import { inspectWalletAddresses, receivingAddressAssessment, type WalletPreflight } from './wallet-preflight.ts';
 import { createPaymentAudit, decodePaymentAudit, auditUrl, type PublicPaymentAudit } from './audit.ts';
 import { checkPublicMainnetRpc, verifyNimTransaction, type VerifyResult, type RpcNetworkCheck } from './rpc.ts';
 import {
@@ -29,6 +30,9 @@ let tenantHash = '';
 let tenantVerifyBusy = false;
 let tenantVerifyResult: VerifyResult | null = null;
 let check: HostCheck | null = null;
+let walletSnapshot: WalletPreflight | null = null;
+let walletInventoryBusy = false;
+let walletInventoryError = '';
 let hostStatus: 'unchecked' | 'checking' | 'connected' | 'error' = 'unchecked';
 let hostMessage = '';
 let rpcChecking = false;
@@ -227,6 +231,24 @@ function chargesView(p:Portfolio):string {
   ${renewalPlanner(p)}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Sending is not settlement.</strong><p>All requests start OPEN. Any wallet-submitted hash remains unverified until independent chain verification is implemented.</p></div></div>`;
 }
+function walletInventoryPanel():string {
+  const data=walletSnapshot;
+  const accountRows=data?.accounts.map((a,i)=>{
+    const short=`${a.address.slice(0,8)}…${a.address.slice(-7)}`;
+    const balance=a.balanceLuna===null?'Unknown · read failed':formatNim(a.balanceLuna)+' NIM reported';
+    return `<div class="account-row"><div><small>Shared address ${i+1} — not necessarily the sending address</small><strong class="mono">${escapeHtml(short)}</strong><small>${escapeHtml(balance)}</small></div><button type="button" class="tertiary" data-wallet-copy="${escapeHtml(a.address)}">Copy public address</button></div>`;
+  }).join('')||'';
+  const warnings=data?.warnings.map(t=>`<p class="account-warning">${escapeHtml(t)}</p>`).join('')||'';
+  return `<section class="wallet-inventory" aria-label="Read-only wallet address inspection">
+    <div class="eyebrow">G2 · WALLET PREFLIGHT · NO PAYMENT</div>
+    <h3>Check your connected wallet</h3>
+    <p>Share public Nimiq addresses with this Mini App to check their on-chain balances. Nimiq Pay may ask permission. We do not store these addresses in your rental ledger or send any NIM.</p>
+    <button id="wallet-accounts-read" type="button" class="tertiary" ${walletInventoryBusy||hostStatus!=='connected'||check?.network!=='mainnet'?'disabled':''}>${walletInventoryBusy?'Reading your accounts…':'Check my addresses and balances'}</button>
+    ${hostStatus!=='connected'||check?.network!=='mainnet'?'<p class="account-warning">First use Check host and confirm MAINNET.</p>':''}
+    ${walletInventoryError?`<div class="inline-alert" role="status">${escapeHtml(walletInventoryError)}</div>`:''}
+    ${data?`<div class="account-list" role="status">${accountRows}${warnings}<p class="account-note">Balance readings are per address and do not prove the account Nimiq Pay will select to send. The same address cannot pay itself. To test a payment, choose a second independently confirmed NQ recipient that is not one of these shared payer-wallet addresses.</p></div>`:''}
+  </section>`;
+}
 function walletView():string {
   return `<div class="page-title"><div><div class="eyebrow">NIMIQ PAY · HOST GATE</div><h1>Wallet <em>connection.</em></h1><p>Check the actual Mini App provider, not a standalone Safari browser tab.</p></div></div>
   <div class="wallet-panel"><div class="wallet-large">${icon('wallet')}</div><h2>${hostStatus==='connected'?'SDK provider detected':'Connect Nimiq Pay'}</h2><p class="wallet-copy">${hostStatus==='connected' ? (check?.consensus?'Nimiq Pay SDK responded. Its reported wallet network is shown below, separately from public mainnet RPC. Both must be checked before considering any payment.':'Provider found but consensus is not established.') : 'Open this app from Nimiq Pay → Mini Apps to authorize SDK access. Browsers alone do not inject the wallet provider.'}</p>
@@ -234,6 +256,7 @@ function walletView():string {
   ${hostStatus==='error'?`<div class="inline-alert">${icon('alert')} ${escapeHtml(hostMessage)}</div>`:''}
   ${hostStatus==='connected'?`<div class="host-report"><div><span>Host provider</span><b>Detected</b></div><div><span>Consensus</span><b>${check?.consensus?'Established':'Unavailable'}</b></div><div><span>Block height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>Balance method</span><b>${check?.balanceReadAvailable?'Available':'Missing / old host'}</b></div><div><span>Wallet network (host-reported)</span><b>${escapeHtml((check?.network??'unknown').toUpperCase())}</b></div><div><span>Independent mainnet</span><b>${rpcNetwork?.state==='MAINNET_REPORTED'?'Public RPC only':'Not verified'}</b></div></div>`:''}
   </div>
+  ${walletInventoryPanel()}
   <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>Normal previews cannot initiate wallet payment. A dedicated, human-approved capped mainnet test build would additionally require fresh host + public RPC checks and native confirmation. We never request private keys or equate a hash with final settlement.</p></div></div>`;
 }
 function g3Panel(p:Portfolio):string {
@@ -291,6 +314,7 @@ function smokeAssessment(request:SharedRequest):SmokeAssessment{
     priorAttemptUnresolved:!!submittedHash||outcomeUnknown||paymentBusy,
     recipient:request.recipient,
     allowlistedRecipient:import.meta.env.VITE_SMOKE_ALLOW_RECIPIENT??null,
+    sharedPayerAddresses:walletSnapshot?.accounts.map(x=>x.address)??null,
     memo:request.memo
   });
 }
@@ -312,6 +336,9 @@ function tenantView(request:SharedRequest):string {
       <div class="host-report"><div><span>Wallet network</span><b>${escapeHtml(walletNetwork.toUpperCase())}</b></div><div><span>Independent public RPC</span><b>${escapeHtml(rpcNetworkLabel)}</b></div><div><span>SDK height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>RPC height</span><b>${rpcNetwork?.headHeight??'Unknown'}</b></div></div>
       <button class="tertiary full" id="tenant-check-host" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='connected'?'Recheck Nimiq Pay':'Check Nimiq Pay host'}</button>
       <button class="tertiary full" id="tenant-check-rpc" type="button" ${rpcChecking?'disabled':''}>${rpcChecking?'Checking RPC…':'Check independent mainnet RPC'}</button>
+      <button class="tertiary full" id="tenant-check-accounts" type="button" ${walletInventoryBusy||hostStatus!=='connected'||check?.network!=='mainnet'?'disabled':''}>${walletInventoryBusy?'Reading accounts…':'Check payer addresses (native permission)'}</button>
+      ${walletSnapshot?`<div class="account-note">${walletSnapshot.accounts.length} address(es) shared. ${escapeHtml(receivingAddressAssessment(walletSnapshot,request.recipient).message)}</div>`:''}
+      ${walletInventoryError?`<div class="inline-alert">${escapeHtml(walletInventoryError)}</div>`:''}
       <div class="gate-summary" role="status">${!paymentEnabled?'<strong>Read-only deployment — payment intentionally disabled.</strong>':gate.allowed?'<strong>Safety checks passed; wallet approval is still required.</strong>':`<strong>Wallet test blocked:</strong><ul>${warnings.map(reason=>`<li>${escapeHtml(reason)}</li>`).join('')}</ul>`}</div>
       <div class="consent-row"><label class="consent"><input id="ack-recipient" type="checkbox" ${recipientAcknowledged?'checked':''}/> I confirmed the recipient's address through a trusted channel outside this editable link.</label></div>
       <div class="consent-row"><label class="consent"><input id="ack-real-money" type="checkbox" ${realMoneyAcknowledged?'checked':''}/> I understand this will move REAL NIM if I approve it in Nimiq Pay.</label></div>
@@ -451,6 +478,9 @@ function bindEvents():void {
   const g3Form=root!.querySelector<HTMLFormElement>('#g3-verify-form');
   g3Form?.addEventListener('submit',e=>{e.preventDefault();void onVerifyG3(g3Form);});
   g3Form?.addEventListener('input',()=>{txVerifyResult=null;const card=root!.querySelector('#g3-result');if(card)card.textContent='Parameters changed. Verify the new transaction hash before trusting prior results.';});
+  root!.querySelector('#wallet-accounts-read')?.addEventListener('click',()=>void onWalletInventoryRead());
+  root!.querySelector('#tenant-check-accounts')?.addEventListener('click',()=>void onWalletInventoryRead());
+  root!.querySelectorAll<HTMLButtonElement>('[data-wallet-copy]').forEach(btn=>btn.addEventListener('click',()=>void onCopyPublicWalletAddress(btn.dataset.walletCopy||'')));
   root!.querySelector('#check-host')?.addEventListener('click',()=>void onHostCheck());
   root!.querySelector('#tenant-check-host')?.addEventListener('click',()=>void onHostCheck());
   root!.querySelector<HTMLInputElement>('#ack-recipient')?.addEventListener('change',e=>{recipientAcknowledged=(e.target as HTMLInputElement).checked;render();});
@@ -527,8 +557,28 @@ async function onVerifyG3(form:HTMLFormElement):Promise<void>{
     error('Unable to verify. No payment has been credited.');
   }finally{txVerifyBusy=false;render();}
 }
+async function onCopyPublicWalletAddress(address:string):Promise<void>{
+  if(!walletSnapshot?.accounts.some(x=>x.address===address))return;
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(address);
+      success('Public wallet address copied. Never share private keys or recovery phrases.');
+    }else window.prompt('Copy public NQ address only',address);
+  }catch{window.prompt('Copy public NQ address only',address);}
+}
+async function onWalletInventoryRead():Promise<void>{
+  if(walletInventoryBusy||hostStatus!=='connected'||check?.network!=='mainnet'||!check?.consensus)return;
+  walletInventoryBusy=true;walletInventoryError='';walletSnapshot=null;render();
+  try{
+    walletSnapshot=await inspectWalletAddresses(check.provider,check.network);
+  }catch(e){
+    walletInventoryError=e instanceof Error&&e.message.toLowerCase().includes('permission')
+      ? 'Wallet account sharing was declined. No address was read.'
+      : 'Could not read wallet addresses or balances. Check Nimiq Pay permissions and try again.';
+  }finally{walletInventoryBusy=false;render();}
+}
 async function onHostCheck():Promise<void>{
-  hostStatus='checking';hostMessage='';render();
+  hostStatus='checking';hostMessage='';walletSnapshot=null;walletInventoryError='';render();
   try{check=await checkHost();hostStatus='connected';}
   catch(err){check=null;hostStatus='error';hostMessage=explainHostError(err);}
   render();
