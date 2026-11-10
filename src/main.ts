@@ -285,6 +285,48 @@ function walletInventoryPanel():string {
     ${data?`<div class="account-list" role="status">${accountRows}${warnings}<p class="account-note">Balance readings are per address and do not prove the account Nimiq Pay will select to send. The same address cannot pay itself. To test a payment, choose a second independently confirmed NQ recipient that is not one of these shared payer-wallet addresses.</p></div>`:''}
   </section>`;
 }
+function reconciliationDesk(p:Portfolio):string {
+  const selected=p.charges.some(c=>c.id===deskChargeId)?deskChargeId:(p.charges[0]?.id||'');
+  const charge=p.charges.find(c=>c.id===selected);
+  const tracked=charge?claimsForCharge(proofClaims,charge.id):[];
+  const live=charge?reconcileClaimedCharge(charge,proofClaims,liveProofChecks,p.submissions):null;
+  const opts=p.charges.map(c=>{
+    const u=p.units.find(x=>x.id===c.unitId);
+    const prop=p.properties.find(x=>x.id===u?.propertyId);
+    return `<option value='${escapeHtml(c.id)}' ${selected===c.id?'selected':''}>${escapeHtml(prop?.name||'Property')} / ${escapeHtml(u?.label||'Unit')} · ${escapeHtml(c.period)} · ${formatNim(c.amountLuna)} NIM</option>`;
+  }).join('');
+  const items=tracked.map(c=>{
+    const detail=live?.details.find(x=>x.hash===c.hash);
+    const state=detail?.state||'NOT_VERIFIED';
+    return `<div class='proof-item'><div><strong class='mono'>${escapeHtml(c.hash.slice(0,12))}…${escapeHtml(c.hash.slice(-10))}</strong><small>${escapeHtml(state.replaceAll('_',' '))}${detail?.amountLuna!=null?' · '+formatNim(detail.amountLuna)+' NIM':''}</small><p>${escapeHtml(detail?.message||'Not yet rechecked.')}</p></div><button type='button' class='tiny' data-remove-proof='${escapeHtml(c.hash)}' ${deskBusy?'disabled':''}>Remove</button></div>`;
+  }).join('');
+  return `<div class='page-title'><div><div class='eyebrow'>PAYMENT OPERATIONS · MAINNET</div><h1>Reconciliation <em>Desk.</em></h1><p>Track multiple NIM instalments against one rental month, inspect exceptions and share a recheckable statement. No money can be sent here.</p></div></div>
+    <div class='reconcile-hero'><div><small>MONTHLY OBLIGATION</small><strong>${charge?formatNim(charge.amountLuna):'—'} <span>NIM</span></strong></div><div><small>NODE-REPORTED MATCHED</small><strong>${live?formatNim(live.summary.creditedLuna):'0'} <span>NIM</span></strong></div><div><small>REMAINING TO ASSESS</small><strong>${live?formatNim(live.summary.dueLuna):'0'} <span>NIM</span></strong></div></div>
+    <div class='reconcile-disclaimer'>Amounts here are based only on fresh checks in this session (maximum five minutes). A stored hash does not establish payment. Even a matching node report is not legal acceptance of rent. No user funds are moved.</div>
+    ${p.charges.length?`<section class='panel'><h3>1 · Choose a monthly obligation</h3><label class='reconcile-select'>Invoice<select id='desk-charge-selector' ${deskBusy?'disabled':''}>${opts}</select></label><p class='form-hint'>Invoices are local to this browser. There is no automatic landlord/tenant synchronization.</p></section>
+    <section class='panel'><h3>2 · Add a transaction to review</h3><form id='desk-add-claim' class='form-stack'><input type='hidden' name='chargeId' value='${escapeHtml(selected)}'/><label>Public Nimiq transaction hash<input name='hash' type='text' spellcheck='false' autocomplete='off' maxlength='64' pattern='[a-fA-F0-9]{64}' required placeholder='64 hexadecimal characters' ${deskBusy||preview?'disabled':''}/></label><p class='form-hint'>Maximum eight hashes per invoice. A hash cannot be assigned to two rent requests.</p><button type='submit' class='primary' ${deskBusy||preview||tracked.length>=8?'disabled':''}>Track transaction ${icon('plus')}</button></form></section>`:emptyState('Add a property and rent obligation first','The Reconciliation Desk links chain evidence to a specific local invoice.','properties','Start with a property')}
+    ${charge?`<section class='panel'><div class='section-heading'><div><div class='eyebrow'>3 · PROOF REVIEW</div><h2>Payment evidence inbox</h2></div><span class='count'>${tracked.length}/8</span></div>
+      ${items||'<p class=\'form-hint\'>No transactions tracked for this period yet. Add an existing public hash above; this will not send NIM.</p>'}
+      <div class='reconcile-actions'><button id='desk-recheck-all' class='primary' ${deskBusy||preview||!tracked.length?'disabled':''}>${deskBusy?'Reading mainnet…':'Recheck all against mainnet'} ${icon('arrow')}</button><button id='desk-share-statement' class='tertiary' ${deskBusy||preview||!tracked.length?'disabled':''}>Copy public statement link</button></div>
+      <p class='form-hint'>${live?.verified||0} matching · ${live?.unresolved||0} unreviewed/stale · ${live?.rejected||0} unresolved exceptions. ${escapeHtml(deskMessage)}</p>
+      ${live?.summary.status==='REVIEW_REQUIRED'?'<div class=\'inline-alert\'>An exception or excess amount requires manual review; do not declare the charge settled.</div>':''}
+      ${live?.summary.status==='PAID_ONCHAIN_VERIFIED'?'<div class=\'inline-alert\'>One public node reports full matched value. This is not an authenticated landlord receipt.</div>':''}
+    </section>`:''}
+    <div class='safety'><span>${icon('shield')}</span><div><strong>Evidence, not automatic settlement.</strong><p>The landlord must still validate the recipient and tenancy agreement. Anyone with a public statement URL can alter its contents; every viewer needs fresh blockchain checks.</p></div></div>`;
+}
+function publicRentStatementView(bundle:PublicRentStatement):string {
+  const r=bundle.request;
+  const pseudo:Charge={id:r.chargeId,unitId:'0'.repeat(32),period:r.period,recipient:r.recipient,amountLuna:r.amountLuna,memo:r.memo,createdAt:new Date().toISOString()};
+  const refs:ProofClaim[]=bundle.hashes.map(hash=>({chargeId:r.chargeId,hash,recordedAt:new Date().toISOString()}));
+  const checked=reconcileClaimedCharge(pseudo,refs,publicStatementChecks);
+  const rows=checked.details.map(d=>`<div class='proof-item'><div><strong class='mono'>${escapeHtml(d.hash.slice(0,12))}…${escapeHtml(d.hash.slice(-10))}</strong><small>${escapeHtml(d.state.replaceAll('_',' '))}${d.amountLuna!=null?' · '+formatNim(d.amountLuna)+' NIM':''}</small><p>${escapeHtml(d.message)}</p></div></div>`).join('');
+  return `<div class='checkout evidence-checkout'><div class='checkout-head'><div class='eyebrow'>PUBLIC PAYMENT STATEMENT · READ ONLY</div><h1>One rent period. <em>Many payments.</em></h1><p>This is an editable, unsigned link containing a period, destination, amount and public hashes. Only fresh mainnet checks can confirm the claimed transfers.</p></div>
+  <section class='checkout-card'><span class='checkout-label'>${escapeHtml(r.period)} · Requested</span><div class='checkout-value'>${formatNim(r.amountLuna)} <span>NIM</span></div>
+  <div class='detail'><span>Recipient to compare</span><strong class='mono'>${escapeHtml(r.recipient)}</strong></div><div class='detail'><span>Opaque reference</span><strong class='mono'>${escapeHtml(r.memo)}</strong></div>
+  <div class='reconcile-hero'><div><small>NODE-REPORTED MATCHED</small><strong>${formatNim(checked.summary.creditedLuna)} <span>NIM</span></strong></div><div><small>REMAINING</small><strong>${formatNim(checked.summary.dueLuna)} <span>NIM</span></strong></div></div>
+  <button id='recheck-statement' class='primary full' ${publicStatementBusy?'disabled':''}>${publicStatementBusy?'Checking on-chain…':'Recheck all '+bundle.hashes.length+' transactions'} ${icon('arrow')}</button>
+  <p class='form-hint'>${checked.verified} matching · ${checked.unresolved} unreviewed/stale · ${checked.rejected} require review. One public RPC, not a guaranteed receipt. The link itself can be edited.</p>${rows}</section></div>`;
+}
 function walletView():string {
   return `<div class="page-title"><div><div class="eyebrow">NIMIQ PAY · HOST GATE</div><h1>Wallet <em>connection.</em></h1><p>Check the actual Mini App provider, not a standalone Safari browser tab.</p></div></div>
   <div class="wallet-panel"><div class="wallet-large">${icon('wallet')}</div><h2>${hostStatus==='connected'?'SDK provider detected':'Connect Nimiq Pay'}</h2><p class="wallet-copy">${hostStatus==='connected' ? (check?.consensus?'Nimiq Pay SDK responded. Its reported wallet network is shown below, separately from public mainnet RPC. Both must be checked before considering any payment.':'Provider found but consensus is not established.') : 'Open this app from Nimiq Pay → Mini Apps to authorize SDK access. Browsers alone do not inject the wallet provider.'}</p>
