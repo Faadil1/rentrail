@@ -1,7 +1,7 @@
 # RentRail — submission hero demo, G2/G3 mainnet evidence (V1)
 
 **Prepared:** 2026-11-10. **Deadline:** 2026-11-11 23:59 UTC (18:59 EST Gatineau).
-**Status:** storyboard and submission copy prepared; video NOT rendered, public app NOT final, submission NOT filed.
+**Status:** caption-led **97-second genuine-screen-recording reviewer video V2 rendered privately** (available as a conversation attachment, not committed/published); public nonpayment Staging **READY** at source SHA `f3412c2575918d2ee1297e686ba642dc91ea0130`; consolidated code **merged into main** via PR #14; **public-release iPhone acceptance still outstanding; official submission NOT FILED**.
 
 ## Headline — claim exactly what we have proved
 
@@ -34,7 +34,7 @@ Evidence components:
 - **Native modal discrepancy:** Nimiq Pay showed **0.01 NIM** while the chain recorded **0.005 NIM**. Official provider API documents the `value` parameter in Luna, with `100,000 Luna = 1 NIM`; upstream display formatting root cause remains unverified. No second payment is needed to investigate. Report to Nimiq maintainers with private/redacted reproduction.
 - Current public general RentRail preview is **read-only** and cannot offer normal users unrestricted rent payments. The only send-capable 500 Luna pilot deployment was isolated and subsequently protected by Vercel Authentication.
 - Public G3 matches do not automatically credit the landlord's local rent ledger; shared payment requests are **unsigned** and cannot authenticate beneficiary ownership. Local data are not multi-user synchronized.
-- `main` has not yet been updated with the fully tested app source. Stacked PRs must be reviewed, merged and CI rerun before claiming the main branch contains the project.
+- `main` **now includes** the complete consolidated public RentRail app and docs after PR #14 squash merge (`804da16130d55bf91a1895592c53896af2d2d31f`). Main CI: **217/217 PASS**. Old stacked drafts were closed as superseded, with histories intact.
 - No independently documented unrelated outside-user adoption yet. Do not claim any count.
 
 ## Competition submission copy — truthful current build
@@ -53,9 +53,9 @@ We tested the core mechanism with a real, human-approved **0.005 NIM mainnet tra
 
 1. **Resolve demo asset availability and consent:** screen recording from 01:01 and 00:37; B wallet owner's confirmation; choose what can be published.
 2. **Investigate native amount formatting** without sending money; file redacted issue upstream, explain discrepancy in demo or prominently in limitations.
-3. **Finalize public read-only app experience and entrypoint**; review security and make a transparent public build. No public live sends without fresh review.
-4. **Merge stacked PRs or produce a traceable canonical final branch**, verify fresh Actions and real mobile host runtime; update repo README and competition manifest.
-5. **Record honest hero demo** from real captures and a real read-only verification; supply URL/video, mainnet evidence, and privacy-safe project description.
+3. **DONE for public build:** read-only app Staging READY, no send config, distinct from authenticated pilot. **OPEN:** final native iPhone acceptance for this release SHA, any safe general PAY launch requires new review.
+4. **DONE:** canonical PR #14 merged into main, README + MIT visible, main Actions green. **OPEN:** fresh real mobile host runtime on the final public release URL.
+5. **DONE privately:** 97-sec silent/captioned reviewer video V2 assembled from genuine user-recorded iPhone footage and a clearly labeled data card. **OPEN:** human media consent/review and public hosting; it has NOT been submitted or published.
 6. **Submit** through the official Cycle III entry point before 23:59 UTC Nov 11, capture submitted status and exact URL. **Do not infer submission success from GitHub PR draft state.**
 
 Source docs: https://nimiq.dev/mini-apps/api-reference/nimiq-provider ; https://nimiq.dev/mini-apps/faq ; https://miniappscompetition.com/rules .
