@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {assessSmokePayment,SMOKE_MAX_LUNA,MAX_BLOCK_HEIGHT_DRIFT,MAX_RPC_AGE_MS,type SmokeContext} from '../src/smoke-gate.ts';
 const now=Date.UTC(2026,10,9,20,0,0);
 function ready(overrides:Partial<SmokeContext>={}):SmokeContext{
- return {buildAllowsSmoke:true,walletNetwork:'mainnet',consensus:true,walletBlockHeight:66452000,
+ return {buildAllowsSmoke:true,walletNetwork:'mainnet',consensus:true,walletBlockHeight:66452000,hostCheckedAtMs:now-2_000,
  publicRpcNetwork:'MainAlbatross',publicRpcBlockHeight:66452001,
  publicRpcObservedAt:new Date(now-2_000).toISOString(),nowMs:now,
  amountLuna:500,recipientCheckAcknowledged:true,realMoneyAcknowledged:true,
@@ -20,6 +20,8 @@ test('SDK does not return a usable network',()=>rejected({walletNetwork:'unknown
 test('host TESTNET cannot trigger mainnet payment',()=>rejected({walletNetwork:'testnet'}));
 test('absent consensus denies',()=>rejected({consensus:false}));
 test('missing SDK block height denies',()=>rejected({walletBlockHeight:null}));
+test('old host network observation is rejected',()=>rejected({hostCheckedAtMs:now-MAX_RPC_AGE_MS-1}));
+test('host observation absent is rejected',()=>rejected({hostCheckedAtMs:null}));
 test('missing independent RPC block height denies',()=>rejected({publicRpcBlockHeight:null}));
 test('wrong RPC chain denies',()=>rejected({publicRpcNetwork:'TestAlbatross'}));
 test('unverified RPC network denies',()=>rejected({publicRpcNetwork:null}));
