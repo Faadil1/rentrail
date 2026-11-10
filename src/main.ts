@@ -638,6 +638,61 @@ async function onVerifyG3(form:HTMLFormElement):Promise<void>{
     error('Unable to verify. No payment has been credited.');
   }finally{txVerifyBusy=false;render();}
 }
+function nodeFailure(hash:string):VerifyResult {
+  return {state:'UNKNOWN',message:'The public RPC check could not complete. This hash remains unverified.',evidenceSource:'single-public-rpc',rpcUrl:'https://rpc.nimiqwatch.com/',observedAt:new Date().toISOString(),hash,network:'UNVERIFIED'};
+}
+function onAddProofClaim(form:HTMLFormElement):void {
+  if(preview||deskBusy)return;
+  try{
+    const next=addProofClaim(proofClaims,formValue(form,'chargeId'),formValue(form,'hash'),portfolio.charges.map(c=>c.id));
+    saveProofClaims(next);proofClaims=next;
+    deskChargeId=formValue(form,'chargeId');deskMessage='Hash tracked locally. Recheck mainnet before treating it as payment.';
+    success('Public transaction hash added. No amount credited without live verification.');
+  }catch(e){error(e instanceof Error?e.message:'Cannot add this claim.');}
+}
+function onRemoveProofClaim(hash:string):void {
+  if(preview||deskBusy)return;
+  const id=deskChargeId||portfolio.charges[0]?.id;
+  if(!id)return;
+  try{const next=removeProofClaim(proofClaims,id,hash);saveProofClaims(next);proofClaims=next;delete liveProofChecks[hash];
+    deskMessage='Removed local hash reference, not a blockchain transfer.';render();
+  }catch(e){error(e instanceof Error?e.message:'Cannot remove reference.');}
+}
+async function onRecheckDesk():Promise<void>{
+  if(preview||deskBusy)return;
+  const charge=portfolio.charges.find(c=>c.id===(deskChargeId||portfolio.charges[0]?.id));
+  if(!charge)return;
+  const claims=claimsForCharge(proofClaims,charge.id);
+  if(!claims.length)return;
+  deskBusy=true;deskMessage='Checking '+claims.length+' transaction(s) with an independent mainnet history node…';render();
+  try{
+    for(const item of claims){
+      try{liveProofChecks[item.hash]=await verifyNimTransaction({hash:item.hash,recipient:charge.recipient,memo:charge.memo,amountLuna:charge.amountLuna,allowPartial:true});}
+      catch{liveProofChecks[item.hash]=nodeFailure(item.hash);}
+    }
+    deskMessage='Fresh node checks completed. Inspect the result of each hash before relying on the total.';
+  }finally{deskBusy=false;render();}
+}
+async function onShareStatement():Promise<void>{
+  if(preview||deskBusy)return;
+  const charge=portfolio.charges.find(c=>c.id===(deskChargeId||portfolio.charges[0]?.id));
+  if(!charge)return;
+  try{
+    const refs=claimsForCharge(proofClaims,charge.id);
+    const packet=createRentStatement(shareableRequest(charge),refs.map(x=>x.hash));
+    await copyPublicUrl(rentStatementUrl(window.location.origin,window.location.pathname,packet));
+  }catch(e){error(e instanceof Error?e.message:'Could not share a statement.');}
+}
+async function onRecheckPublicStatement():Promise<void>{
+  if(publicStatementBusy||!publicStatement)return;
+  publicStatementBusy=true;publicStatementChecks={};render();
+  try{
+    for(const hash of publicStatement.hashes){
+      try{publicStatementChecks[hash]=await verifyNimTransaction({hash,recipient:publicStatement.request.recipient,memo:publicStatement.request.memo,amountLuna:publicStatement.request.amountLuna,allowPartial:true});}
+      catch{publicStatementChecks[hash]=nodeFailure(hash);}
+    }
+  }finally{publicStatementBusy=false;render();}
+}
 async function onCopyPublicWalletAddress(address:string):Promise<void>{
   if(!walletSnapshot?.accounts.some(x=>x.address===address))return;
   try{
