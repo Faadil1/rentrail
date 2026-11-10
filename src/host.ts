@@ -1,5 +1,6 @@
-import { init, NimiqProviderError } from '@nimiq/mini-app-sdk';
-import { isSafeLuna, looksLikeNimiqAddress, type SharedRequest } from './domain.ts';
+import { init, getHostNetwork, NimiqProviderError } from '@nimiq/mini-app-sdk';
+import { SMOKE_MAX_LUNA, type NimiqHostNetwork, type SmokeAssessment } from './smoke-gate.ts';
+import { isSafeLuna, validateSharedRequest, type SharedRequest } from './domain.ts';
 
 export type NimiqHost = Awaited<ReturnType<typeof init>>;
 export interface HostCheck {
@@ -7,6 +8,7 @@ export interface HostCheck {
   consensus: boolean;
   blockHeight: number | null;
   balanceReadAvailable: boolean;
+  network: NimiqHostNetwork;
 }
 export async function checkHost(): Promise<HostCheck> {
   const provider = await init();
@@ -16,7 +18,9 @@ export async function checkHost(): Promise<HostCheck> {
     const n = await provider.getBlockNumber();
     if (Number.isSafeInteger(n) && n >= 0) blockHeight = n;
   }
-  return { provider, consensus, blockHeight, balanceReadAvailable: typeof provider.getBalance === 'function' };
+  const detected = getHostNetwork();
+  const network: NimiqHostNetwork = detected==='mainnet'||detected==='testnet' ? detected : 'unknown';
+  return { provider, consensus, blockHeight, network, balanceReadAvailable: typeof provider.getBalance === 'function' };
 }
 export function explainHostError(error: unknown): string {
   if (NimiqProviderError.is(error)) {
@@ -26,19 +30,30 @@ export function explainHostError(error: unknown): string {
   }
   return error instanceof Error ? error.message : 'Nimiq Pay could not be reached.';
 }
-/** The only money-moving adapter: invoked from an explicit user-initiated click. */
-export async function submitUserApprovedPayment(provider: NimiqHost, request: SharedRequest): Promise<string> {
-  if (!looksLikeNimiqAddress(request.recipient) || !isSafeLuna(request.amountLuna) || !/^RR1:[a-f0-9]{32}$/.test(request.memo)) {
-    throw new Error('Payment request failed validation.');
-  }
-  if (new TextEncoder().encode(request.memo).length > 64) throw new Error('Public message too long.');
-  if (!(await provider.isConsensusEstablished())) throw new Error('Nimiq consensus is not established. No payment was requested.');
-  // Nimiq Pay selects signer and always requires native user approval.
-  const hash = await provider.sendBasicTransactionWithData({
-    recipient: request.recipient,
-    value: request.amountLuna,
-    data: request.memo,
+/**
+ * The only money-moving adapter, called exclusively by a direct human click.
+ * This is a tightly capped contest smoke-test path, not a general rent payer.
+ * The build switch remains OFF in every public/staging deployment by default.
+ */
+export async function submitUserApprovedPayment(
+  host: HostCheck, request: SharedRequest, assessment: SmokeAssessment
+): Promise<string> {
+  if(import.meta.env.VITE_ENABLE_LIVE_NIM_SEND!=='smoke_test_human_approved')
+    throw Error('This build is read-only; sending NIM is disabled.');
+  if(!assessment.allowed) throw Error('Independent safety and consent gate did not pass.');
+  const payload=validateSharedRequest(request);
+  if(!isSafeLuna(payload.amountLuna)||payload.amountLuna>SMOKE_MAX_LUNA)
+    throw Error('The maximum explicitly controlled smoke amount is 0.01 NIM.');
+  if(host.network!=='mainnet'||getHostNetwork()!=='mainnet')
+    throw Error('The Nimiq Pay host did not explicitly report mainnet. No payment was requested.');
+  if(!host.consensus||!(await host.provider.isConsensusEstablished()))
+    throw Error('Nimiq Pay consensus unavailable. No payment was requested.');
+  // Native wallet confirmation is mandatory. No seed phrase or private key is requested.
+  const hash=await host.provider.sendBasicTransactionWithData({
+    recipient:payload.recipient, value:payload.amountLuna, data:payload.memo,
   });
-  if (!/^[a-f0-9]{64}$/i.test(hash)) throw new Error('Unexpected response after wallet action. Outcome is UNKNOWN; inspect wallet history before retrying.');
-  return hash;
+  // A returned hash is only SUBMITTED_UNVERIFIED; NEVER a settled rent receipt.
+  if(typeof hash!=='string'||!/^[0-9a-f]{64}$/i.test(hash))
+    throw Error('Unexpected wallet response after a send request. Outcome UNKNOWN: inspect wallet history and do not retry.');
+  return hash.toLowerCase();
 }
