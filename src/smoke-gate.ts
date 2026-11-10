@@ -1,3 +1,4 @@
+import { isValidNimiqAddress } from './address-validation.ts';
 /**
  * G2 HUMAN-CONTROLLED SMOKE-TEST GATE.
  * This module cannot send money. It only evaluates whether the UI may OFFER
@@ -55,10 +56,10 @@ export function assessSmokePayment(ctx: SmokeContext): SmokeAssessment {
   if(!Number.isSafeInteger(ctx.amountLuna)||ctx.amountLuna<1||ctx.amountLuna>SMOKE_MAX_LUNA) {
     reasons.push('Smoke payment must be >0 and at most 0.01 NIM.');
   }
-  if(!/^NQ[0-9]{2}[0-9A-HJ-NP-VX-Y]{32}$/.test(ctx.recipient.replace(/\s+/g,'').toUpperCase())){
+  if(!isValidNimiqAddress(ctx.recipient)){
     reasons.push('Recipient address structure is invalid.');
   }
-  if(typeof ctx.allowlistedRecipient!=='string' ||
+  if(typeof ctx.allowlistedRecipient!=='string'||!isValidNimiqAddress(ctx.allowlistedRecipient)||
      ctx.recipient.replace(/\s+/g,'').toUpperCase()!==ctx.allowlistedRecipient.replace(/\s+/g,'').toUpperCase()){
     reasons.push('Recipient is not the explicitly approved test wallet address.');
   }
