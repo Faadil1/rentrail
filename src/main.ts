@@ -1,4 +1,5 @@
 import './styles.css';
+import {createWorkspaceBackup,readWorkspaceBackup,backupSummary,type PortableWorkspace} from './workspace-portability.ts';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
@@ -22,6 +23,8 @@ let portfolio: Portfolio = loadPortfolio();
 let preview = false;
 let selectedView: View = 'overview';
 let workspaceMonth = currentPeriod();
+let importCandidate:PortableWorkspace|null=null;
+let importError='';
 let filterProperty = '';
 let nextPeriodPreview: {period:string; count:number; skipped:number; next:string}|null=null;
 let publicAudit: PublicPaymentAudit | null = null;
@@ -232,6 +235,23 @@ function propertiesView(p:Portfolio):string {
   <section class="stack"><div class="section-heading"><h2>Buildings</h2><span class="count">${p.properties.length}</span></div>${cards||emptyState('No properties yet','Add your first building using the form.', 'properties','Get started')}</section></div>
   <p class="footnote">Private labels are held only in this device's local browser storage. Do not treat them as backed up or shared with other users.</p>`;
 }
+function portableWorkspacePanel(p:Portfolio):string {
+ const counts=backupSummary(p);
+ const restore=importCandidate?backupSummary(importCandidate.portfolio):null;
+ return `<section class="panel portable-panel" aria-label="Export and restore your local rental workspace">
+   <div class="eyebrow">CONTINUITY · DATA PORTABILITY</div>
+   <h3>Keep your rental records across devices</h3>
+   <p>Export your local property, unit, monthly charge and unverified-submission records as JSON. Import on another device after reviewing the counts. This is <strong>not a live sync</strong>, not an attested on-chain receipt, and not encrypted. Store copies privately.</p>
+   <div class="portable-metrics"><span><b>${counts.properties}</b> properties</span><span><b>${counts.units}</b> units</span><span><b>${counts.charges}</b> charges</span><span><b>${counts.unverified}</b> unverified sends</span></div>
+   <button type="button" id="workspace-export" class="tertiary" ${preview?'disabled':''}>Export JSON backup</button>
+   <form id="workspace-import" class="form-stack">
+     <label>Restore JSON backup<textarea name="backup" rows="3" maxlength="200000" spellcheck="false" autocomplete="off" placeholder="Paste a RentRail workspace JSON export" required></textarea></label>
+     <button type="submit" class="tertiary" ${preview?'disabled':''}>Preview import — no changes yet</button>
+   </form>
+   ${importError?`<div class="inline-alert" role="alert">${escapeHtml(importError)}</div>`:''}
+   ${restore?`<div class="import-preview" role="status"><b>Valid workspace snapshot</b><p>${restore.properties} properties · ${restore.units} units · ${restore.charges} rent charges · ${restore.unverified} unverified submissions</p><p>Imported hashes and statuses are never legal payment receipts. Reverify each on-chain transaction independently. Import replaces this device's current local workspace, never merges it.</p><label class="consent"><input type="checkbox" id="restore-ack"> I understand this replaces existing local records and is not proof of payment.</label><button type="button" id="workspace-apply" class="primary" disabled>Replace local workspace with preview</button></div>`:''}
+ </section>`;
+}
 function chargesView(p:Portfolio):string {
   return `<div class="page-title"><div><div class="eyebrow">RENT LEDGER</div><h1>Monthly <em>obligations.</em></h1><p>Requests and partial-payment accounting, without false confirmations.</p></div></div>
   <div class="two-col"><section class="panel"><h3>New rent obligation</h3><form id="charge-form" class="form-stack">
@@ -242,6 +262,7 @@ function chargesView(p:Portfolio):string {
     <button class="primary" type="submit" ${preview||!p.units.length?'disabled':''}>${icon('plus')} Create obligation</button>
   </form></section><section class="stack"><div class="section-heading"><h2>Rent requests</h2><span class="count">${p.charges.length}</span></div>${p.charges.length?p.charges.slice().reverse().map(c=>chargeRow(p,c)).join(''):emptyState('No obligations recorded','Create a property and a unit before issuing a request.','properties','Set up property')}</section></div>
   ${renewalPlanner(p)}
+  ${portableWorkspacePanel(p)}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Sending is not settlement.</strong><p>All requests start OPEN. Any wallet-submitted hash remains unverified until independent chain verification is implemented.</p></div></div>`;
 }
 function walletInventoryPanel():string {
@@ -434,6 +455,28 @@ function bindEvents():void {
   }));
   root!.querySelector('#preview-demo')?.addEventListener('click',()=>{preview=true; render();});
   root!.querySelector('#exit-preview')?.addEventListener('click',()=>{preview=false; render();});
+  root!.querySelector('#workspace-export')?.addEventListener('click',()=>void onWorkspaceExport());
+  root!.querySelector<HTMLFormElement>('#workspace-import')?.addEventListener('submit',event=>{
+    event.preventDefault();if(preview)return;
+    const form=event.target as HTMLFormElement;
+    try{importCandidate=readWorkspaceBackup(formValue(form,'backup'));importError='';render();}
+    catch(err){importCandidate=null;importError=err instanceof Error?err.message:'Backup rejected';render();}
+  });
+  root!.querySelector<HTMLInputElement>('#restore-ack')?.addEventListener('change',event=>{
+    const btn=root!.querySelector<HTMLButtonElement>('#workspace-apply');
+    if(btn)btn.disabled=!(event.target as HTMLInputElement).checked;
+  });
+  root!.querySelector('#workspace-apply')?.addEventListener('click',()=>{
+    if(!importCandidate||preview)return;
+    const ack=root!.querySelector<HTMLInputElement>('#restore-ack');
+    if(!ack?.checked)return;
+    try{
+      // Revalidate before write, never merge imported wallet status with our browser.
+      const validated=readWorkspaceBackup(JSON.stringify(importCandidate));
+      savePortfolio(validated.portfolio);portfolio=validated.portfolio;
+      importCandidate=null;importError='';success('Workspace restored locally. Reverify past transfer hashes against mainnet.');
+    }catch(err){importError=err instanceof Error?err.message:'Restore failed';render();}
+  });
   const propertyForm=root!.querySelector<HTMLFormElement>('#property-form');
   propertyForm?.addEventListener('submit',e=>{e.preventDefault();try{safePersist(addProperty(portfolio,{id:randomId(),name:formValue(propertyForm,'name'),createdAt:new Date().toISOString()}));success('Property added locally.');}catch(err){error(explainHostError(err));}});
   const unitForm=root!.querySelector<HTMLFormElement>('#unit-form');
@@ -506,6 +549,18 @@ function bindEvents():void {
   root!.querySelector('#send-payment')?.addEventListener('click',()=>void onTenantPay());
 }
 
+async function onWorkspaceExport():Promise<void>{
+ if(preview)return;
+ try{
+   const json=createWorkspaceBackup(portfolio);
+   if(navigator.clipboard?.writeText){
+     await navigator.clipboard.writeText(json);
+     success('Backup JSON copied. Keep it private; it contains property labels and public receiving addresses.');
+   }else{
+     window.prompt('Copy private RentRail workspace JSON',json);
+   }
+ }catch(err){error(err instanceof Error?err.message:'Unable to export workspace.');}
+}
 async function copyPublicUrl(url:string):Promise<void>{
   if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(url);success('Public verification link copied. Share only with people who need to review the payment.');return;}catch{/* fall back */}}
   window.prompt('Copy public verification link',url);
