@@ -1,4 +1,6 @@
 import './styles.css';
+import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
+import { createPaymentAudit, decodePaymentAudit, auditUrl, type PublicPaymentAudit } from './audit.ts';
 import { checkPublicMainnetRpc, verifyNimTransaction, type VerifyResult, type RpcNetworkCheck } from './rpc.ts';
 import {
   addCharge, addProperty, addUnit, createId, emptyPortfolio, formatNim, makeMemo,
@@ -15,6 +17,16 @@ if (!root) throw new Error('Missing application mount element.');
 let portfolio: Portfolio = loadPortfolio();
 let preview = false;
 let selectedView: View = 'overview';
+let workspaceMonth = currentPeriod();
+let filterProperty = '';
+let nextPeriodPreview: {period:string; count:number; skipped:number; next:string}|null=null;
+let publicAudit: PublicPaymentAudit | null = null;
+let publicAuditError = '';
+let publicAuditBusy = false;
+let publicAuditResult: VerifyResult | null = null;
+let tenantHash = '';
+let tenantVerifyBusy = false;
+let tenantVerifyResult: VerifyResult | null = null;
 let check: HostCheck | null = null;
 let hostStatus: 'unchecked' | 'checking' | 'connected' | 'error' = 'unchecked';
 let hostMessage = '';
@@ -39,7 +51,10 @@ let outcomeUnknown = false;
 function localPaymentKey(id:string):string{return `rentrail-pending-${id}`;}
 
 const search = new URLSearchParams(window.location.search);
-if (search.has('pay')) {
+if (search.has('audit')) {
+  try {publicAudit = decodePaymentAudit(search.get('audit') || '');}
+  catch(error){publicAuditError=error instanceof Error?error.message:'Invalid verification link.';}
+} else if (search.has('pay')) {
   try {
     tenantRequest = decodeRequest(search.get('pay') || '');
     const prior = localStorage.getItem(localPaymentKey(tenantRequest.chargeId));
@@ -130,10 +145,48 @@ function overview(p: Portfolio): string {
       <div class="metric"><div class="metric-top"><span>Active units</span>${icon('home')}</div><strong>${p.units.length}</strong><span class="metric-foot">Across ${p.properties.length} properties</span></div>
       <div class="metric"><div class="metric-top"><span>Unverified sends</span>${icon('clock')}</div><strong>${submitted}</strong><span class="metric-foot">Never counted as rent paid</span></div>
     </div>
+    ${periodCockpit(p)}
     <section class="section"><div class="section-heading"><div><div class="eyebrow">YOUR WORKSPACE</div><h2>Recent obligations</h2></div><button class="tertiary" data-nav="charges">View all ${icon('arrow')}</button></div>
       ${chargeCards || emptyState('No rent charges yet','Create a property and unit, then issue your first monthly rent request.','properties','Create a property')}
     </section>
     <div class="safety"><span>${icon('shield')}</span><div><strong>Designed to show what is proven.</strong><p>Sending a transaction never marks an obligation as paid. Independent mainnet reconciliation is a separate required gate.</p></div></div>`;
+}
+function periodCockpit(p:Portfolio):string {
+  const snap=monthSnapshot(p,workspaceMonth,filterProperty);
+  const options=p.properties.map(x=>`<option value="${escapeHtml(x.id)}" ${filterProperty===x.id?'selected':''}>${escapeHtml(x.name)}</option>`).join('');
+  const monthlyLines=snap.lines.slice(0,8).map(line=>`<div class="period-line">
+    <div><strong>${escapeHtml(line.unitLabel)}</strong><small>${escapeHtml(line.propertyName)}</small></div>
+    <div><strong>${formatNim(line.outstandingLuna)} NIM</strong><small>${line.status==='SUBMITTED_UNVERIFIED'?'Wallet send unverified':'Local obligation; no verified payment'}</small></div></div>`).join('');
+  return `<section class="period-cockpit" aria-label="Monthly rental operations">
+    <div class="section-heading"><div><div class="eyebrow">MONTHLY OPERATIONS</div><h2>Period cockpit</h2></div><span class="count">Locally recorded, not bank balances</span></div>
+    <div class="period-filters"><label>Month<input id="month-filter" type="month" value="${escapeHtml(workspaceMonth)}"/></label>
+    <label>Property<select id="property-filter"><option value="">All properties</option>${options}</select></label></div>
+    <div class="period-metrics">
+      <div><small>Amount requested</small><strong>${formatNim(snap.expectedLuna)} NIM</strong></div>
+      <div><small>Unverified outstanding</small><strong>${formatNim(snap.outstandingLuna)} NIM</strong></div>
+      <div><small>Units missing an invoice</small><strong>${snap.unitsWithoutCharge} / ${snap.activeUnits}</strong></div>
+      <div><small>Wallet sends awaiting proof</small><strong>${snap.awaitingProof}</strong></div>
+    </div>
+    <div class="period-lines">${monthlyLines||'<div class="empty-period">No invoices for this period or property. Create one in the Rent ledger.</div>'}</div>
+    <div class="period-actions"><button class="tertiary" data-nav="charges" type="button">Manage this month ${icon('arrow')}</button><p>Monthly planning uses local invoices only. No rent is marked paid from browser data.</p></div>
+  </section>`;
+}
+function renewalPlanner(p:Portfolio):string {
+  const source=p.charges.filter(c=>c.period===workspaceMonth);
+  const next=nextMonth(workspaceMonth);
+  const eligible=source.filter(c=>!p.charges.some(x=>x.unitId===c.unitId&&x.period===next));
+  const matches=nextPeriodPreview?.period===workspaceMonth && nextPeriodPreview.count===eligible.length;
+  return `<section class="renewal-panel" aria-label="Next-month invoice planner">
+    <div class="eyebrow">REPEAT VALUE · RENTAL CYCLE</div>
+    <h2>Prepare the next month</h2>
+    <p>Carry forward the amounts and receiving addresses for ${escapeHtml(workspaceMonth)} into ${escapeHtml(next)}. Each new invoice receives a <strong>new opaque public reference</strong>. No payment or reminder is sent.</p>
+    <div class="renewal-stats"><strong>${eligible.length}</strong> invoice${eligible.length===1?'':'s'} eligible · ${source.length-eligible.length} already planned for ${escapeHtml(next)}</div>
+    <div class="renewal-actions">
+      <button id="preview-renewal" class="tertiary" type="button" ${preview||eligible.length===0?'disabled':''}>Review invoices</button>
+      ${matches?`<button id="confirm-renewal" class="primary" type="button" ${preview?'disabled':''}>Create ${eligible.length} draft invoice${eligible.length===1?'':'s'} ${icon('arrow')}</button>`:''}
+    </div>
+    ${matches?'<p class="inline-alert">Review: only the next month is created. Existing invoices are not replaced. This does not request wallet approval or confirm any rent payment.</p>':''}
+  </section>`;
 }
 function emptyState(title:string, description:string, goto:View, action:string):string {
   return `<div class="empty"><div class="empty-icon">${icon('building')}</div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(description)}</p><button class="primary" type="button" data-nav="${goto}">${escapeHtml(action)} ${icon('arrow')}</button></div>`;
@@ -164,6 +217,7 @@ function chargesView(p:Portfolio):string {
     <p class="form-hint">The memo will be an opaque ID, never a tenant name or address. Amounts here are NIM obligations, not automatic fiat conversions.</p>
     <button class="primary" type="submit" ${preview||!p.units.length?'disabled':''}>${icon('plus')} Create obligation</button>
   </form></section><section class="stack"><div class="section-heading"><h2>Rent requests</h2><span class="count">${p.charges.length}</span></div>${p.charges.length?p.charges.slice().reverse().map(c=>chargeRow(p,c)).join(''):emptyState('No obligations recorded','Create a property and a unit before issuing a request.','properties','Set up property')}</section></div>
+  ${renewalPlanner(p)}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Sending is not settlement.</strong><p>All requests start OPEN. Any wallet-submitted hash remains unverified until independent chain verification is implemented.</p></div></div>`;
 }
 function walletView():string {
@@ -198,6 +252,7 @@ function g3Panel(p:Portfolio):string {
     </form>
     ${!charges.length?'<div class="inline-alert">Create an actual local rent obligation before checking a transaction. Fictional example charges are never verified as real.</div>':''}
     ${txResult}
+    ${txVerifyResult?.state==='FINAL_MATCHED' && txVerifiedChargeId===txChargeId?'<button id="g3-copy-audit" class="tertiary" type="button">Copy independent recheck link</button>':''}
     <div class="safety"><span>${icon('shield')}</span><div><strong>Payment sends remain locked.</strong><p>Nothing here sends NIM, stores wallet secrets, or marks rent paid automatically.</p></div></div>
   </section>`;
 }
@@ -224,20 +279,52 @@ function tenantView(request:SharedRequest):string {
     <div class="checkout-status">${hostMessage ? escapeHtml(hostMessage) : hostStatus==='connected' ? `Wallet bridge: detected · Consensus ${check?.consensus?'established':'not ready'}` : hostStatus==='error'?escapeHtml(hostMessage):'Wallet bridge not yet verified on this device.'}</div>
     ${submittedHash?`<div class="pending-result"><strong>Submitted, NOT verified as paid</strong><span class="mono">${escapeHtml(submittedHash)}</span><p>Check your wallet history. No independent finality/reconciliation has been performed in this build.</p></div>`:''}
     ${outcomeUnknown?`<div class="pending-result"><strong>Outcome unknown — DO NOT retry yet</strong><p>Inspect Nimiq Pay transaction history and independently verify on-chain before attempting another payment.</p></div>`:''}
-  </div><p class="checkout-foot">RentRail is non-custodial. Payment approval happens inside Nimiq Pay, never in this page.</p></div>`;
+  </div>${tenantEvidencePanel(request)}<p class="checkout-foot">RentRail is non-custodial. Payment approval happens inside Nimiq Pay, never in this page.</p></div>`;
+}
+function tenantEvidencePanel(request: SharedRequest): string {
+  const result=tenantVerifyResult ? `<div class="g3-result" role="status"><strong>${tenantVerifyResult.state==='FINAL_MATCHED'?'Public node reports matching finality':escapeHtml(tenantVerifyResult.state.replaceAll('_',' '))}</strong><p>${escapeHtml(tenantVerifyResult.message)}</p><small>Checked ${escapeHtml(tenantVerifyResult.observedAt)}</small></div>`:'';
+  return `<section class="checkout-card evidence-card">
+    <div class="eyebrow">VERIFY A RENT TRANSFER · READ ONLY</div><h2>Know what happened on-chain</h2>
+    <p>Already sent NIM? Paste its public transaction hash. Our independent public node checks the recipient, month reference, amount, and finality. No funds are moved here.</p>
+    <form id="tenant-proof-form" class="form-stack">
+      <label>Public transaction hash<input name="hash" value="${escapeHtml(tenantHash)}" maxlength="64" pattern="[a-fA-F0-9]{64}" type="text" spellcheck="false" autocomplete="off" placeholder="64 hexadecimal characters" required/></label>
+      <button class="primary full" ${tenantVerifyBusy?'disabled':''} type="submit">${tenantVerifyBusy?'Checking…':'Verify transaction'} ${icon('arrow')}</button>
+    </form>
+    ${result}
+    ${tenantVerifyResult?.state==='FINAL_MATCHED'?'<button id="tenant-copy-audit" class="tertiary full" type="button">Copy shareable recheck link</button>':''}
+    <small>Any link can be modified. This is not proof of the landlord's identity, nor legal confirmation that rent is paid. A fresh independent check is required by each viewer.</small>
+  </section>`;
+}
+function independentAuditView(audit:PublicPaymentAudit):string {
+  const r=audit.request;
+  const status=publicAuditResult ? `<div class="g3-result" role="status"><strong>${publicAuditResult.state==='FINAL_MATCHED'?'Matching finality reported by one public RPC node':escapeHtml(publicAuditResult.state.replaceAll('_',' '))}</strong><p>${escapeHtml(publicAuditResult.message)}</p><small>${escapeHtml(publicAuditResult.observedAt)}</small></div>`:
+    '<div class="inline-alert">Not verified on this device. Press Recheck blockchain to request fresh public RPC evidence.</div>';
+  return `<div class="checkout evidence-checkout"><div class="checkout-head"><div class="eyebrow">RENT EVIDENCE · INDEPENDENT RECHECK</div><h1>See the transaction. <em>Check the facts.</em></h1><p>Open this link on any device to independently query a public Nimiq node. No account, custody or private rent records required.</p></div>
+  <section class="checkout-card">
+    <span class="checkout-label">${escapeHtml(r.period)} · Public payment request</span>
+    <div class="checkout-value">${formatNim(r.amountLuna)} <span>NIM requested</span></div>
+    <div class="hr"></div>
+    <div class="detail"><span>Expected recipient</span><strong class="mono">${escapeHtml(r.recipient)}</strong></div>
+    <div class="detail"><span>Opaque month reference</span><strong class="mono">${escapeHtml(r.memo)}</strong></div>
+    <div class="detail"><span>Transaction to check</span><strong class="mono">${escapeHtml(audit.txHash)}</strong></div>
+    <button id="audit-recheck" class="primary full" ${publicAuditBusy?'disabled':''} type="button">${publicAuditBusy?'Checking public RPC…':'Recheck blockchain independently'} ${icon('arrow')}</button>
+    ${status}
+    <div class="inline-alert">This public link is **not digitally signed** and can be modified. Confirm recipient ownership with the landlord independently. A blockchain match is not proof that a legal rental obligation is discharged.</div>
+    <a class="tertiary" href="/">Back to RentRail</a>
+  </section></div>`;
 }
 function render():void {
   const p=activePortfolio();
-  const content=tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),wallet:walletView() + g3Panel(p)})[selectedView];
-  root!.innerHTML=`<div class="app-shell ${tenantRequest?'tenant-shell':''}">
+  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),wallet:walletView() + g3Panel(p)})[selectedView];
+  root!.innerHTML=`<div class="app-shell ${tenantRequest||publicAudit||publicAuditError?'tenant-shell':''}">
     <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>WORKING NAME</small></span></a>
       <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('wallet','Wallet gate','wallet')}</nav>
       <div class="sidebar-bottom"><div class="side-note">${icon('shield')}<span>Non-custodial<br/><small>Evidence-first payments</small></span></div><div class="sidebar-footer">CYCLE III · PAY<br/>2026 BUILD</div></div>
-    </aside><div class="main-wrap"><header class="topbar"><div class="mobile-brand">R<span>·</span><small>rentrail</small></div><span class="topbar-caption">${tenantRequest?'RENT PAYMENT':selectedView.toUpperCase()}</span><div class="topbar-right"><span class="label-chip">${preview?'EXAMPLE PREVIEW':'LOCAL WORKSPACE'}</span>${walletIndicator()}</div></header>
+    </aside><div class="main-wrap"><header class="topbar"><div class="mobile-brand">R<span>·</span><small>rentrail</small></div><span class="topbar-caption">${publicAudit?'RENT EVIDENCE':tenantRequest?'RENT PAYMENT':selectedView.toUpperCase()}</span><div class="topbar-right"><span class="label-chip">${preview?'EXAMPLE PREVIEW':'LOCAL WORKSPACE'}</span>${walletIndicator()}</div></header>
       <main class="main-content">${preview?`<div class="demo-banner">${icon('alert')} EXAMPLE PREVIEW ONLY — fictional units, no real payments. <button id="exit-preview">Exit preview</button></div>`:''}${content}${toast?`<div class="toast" role="status">${escapeHtml(toast)}</div>`:''}</main>
-      ${!tenantRequest?`<nav class="mobile-nav" aria-label="Mobile navigation">${navButton('overview','Home','home')}${navButton('properties','Units','building')}${navButton('charges','Rent','receipt')}${navButton('wallet','Wallet','wallet')}</nav>`:''}
+      ${!tenantRequest&&!publicAudit&&!publicAuditError?`<nav class="mobile-nav" aria-label="Mobile navigation">${navButton('overview','Home','home')}${navButton('properties','Units','building')}${navButton('charges','Rent','receipt')}${navButton('wallet','Wallet','wallet')}</nav>`:''}
     </div></div>`;
-  if(!tenantRequest&&!tenantError&&!p.properties.length&&selectedView==='overview'&&!preview) {
+  if(!tenantRequest&&!tenantError&&!publicAudit&&!publicAuditError&&!p.properties.length&&selectedView==='overview'&&!preview) {
     const empty = document.createElement('div');
     empty.className='start-banner';
     empty.innerHTML=`<strong>Explore before you create</strong><p>See a clearly labeled fictional portfolio, or set up your own local workspace.</p><button id="preview-demo" class="secondary" type="button">Preview example workspace ${icon('arrow')}</button>`;
@@ -271,6 +358,45 @@ function bindEvents():void {
     try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url.toString());success('Payment-request link copied. Verify recipient with the other party.');}else{window.prompt('Copy this payment-request link',url.toString());success('Request link shown for copying.');}}
     catch{window.prompt('Copy this payment-request link',url.toString());}
   }));
+  root!.querySelector<HTMLInputElement>('#month-filter')?.addEventListener('change',e=>{
+    const month=(e.target as HTMLInputElement).value;
+    if(!/^\\d{4}-(0[1-9]|1[0-2])$/.test(month))return;
+    workspaceMonth=month;nextPeriodPreview=null;render();
+  });
+  root!.querySelector<HTMLSelectElement>('#property-filter')?.addEventListener('change',e=>{
+    filterProperty=(e.target as HTMLSelectElement).value;render();
+  });
+  root!.querySelector('#preview-renewal')?.addEventListener('click',()=>{
+    if(preview)return;
+    try {
+      const next=nextMonth(workspaceMonth);
+      const source=portfolio.charges.filter(c=>c.period===workspaceMonth);
+      const eligible=source.filter(c=>!portfolio.charges.some(x=>x.unitId===c.unitId&&x.period===next));
+      nextPeriodPreview={period:workspaceMonth,next,count:eligible.length,skipped:source.length-eligible.length};
+      render();
+    }catch(err){error(explainHostError(err));}
+  });
+  root!.querySelector('#confirm-renewal')?.addEventListener('click',()=>{
+    if(preview||!nextPeriodPreview||nextPeriodPreview.period!==workspaceMonth)return;
+    try{
+      const next=nextMonth(workspaceMonth);
+      const source=portfolio.charges.filter(c=>c.period===workspaceMonth);
+      const eligible=source.filter(c=>!portfolio.charges.some(x=>x.unitId===c.unitId&&x.period===next));
+      if(eligible.length!==nextPeriodPreview.count)throw Error('Monthly plan changed: review again.');
+      const result=planNextPeriod(portfolio,workspaceMonth,eligible.map(()=>randomId()),new Date().toISOString());
+      nextPeriodPreview=null;
+      safePersist(result.portfolio);
+      success(`${result.generated} local invoice(s) created for ${result.newPeriod}. No NIM was sent.`);
+    }catch(err){nextPeriodPreview=null;error(explainHostError(err));}
+  });
+  root!.querySelector('#tenant-proof-form')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    const form=e.target as HTMLFormElement;
+    void onTenantEvidence(form);
+  });
+  root!.querySelector('#audit-recheck')?.addEventListener('click',()=>void onAuditRecheck());
+  root!.querySelector('#tenant-copy-audit')?.addEventListener('click',()=>void onCopyAudit('tenant'));
+  root!.querySelector('#g3-copy-audit')?.addEventListener('click',()=>void onCopyAudit('owner'));
   root!.querySelector('#g3-network')?.addEventListener('click',()=>void onRpcCheck());
   const g3Form=root!.querySelector<HTMLFormElement>('#g3-verify-form');
   g3Form?.addEventListener('submit',e=>{e.preventDefault();void onVerifyG3(g3Form);});
@@ -279,6 +405,50 @@ function bindEvents():void {
   root!.querySelector('#tenant-check-host')?.addEventListener('click',()=>void onHostCheck());
   root!.querySelector<HTMLInputElement>('#ack-payment')?.addEventListener('change',e=>{paymentAcknowledged=(e.target as HTMLInputElement).checked;render();});
   root!.querySelector('#send-payment')?.addEventListener('click',()=>void onTenantPay());
+}
+
+async function copyPublicUrl(url:string):Promise<void>{
+  if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(url);success('Public verification link copied. Share only with people who need to review the payment.');return;}catch{/* fall back */}}
+  window.prompt('Copy public verification link',url);
+}
+async function onCopyAudit(where:'tenant'|'owner'):Promise<void>{
+  try{
+    let request:SharedRequest;
+    let hash:string;
+    if(where==='tenant'){
+      if(!tenantRequest||tenantVerifyResult?.state!=='FINAL_MATCHED')return;
+      request=tenantRequest;hash=tenantHash;
+    }else{
+      if(txVerifyResult?.state!=='FINAL_MATCHED')return;
+      const charge=portfolio.charges.find(c=>c.id===txChargeId);
+      if(!charge||txVerifiedChargeId!==charge.id)return;
+      request=shareableRequest(charge);hash=txHashInput;
+    }
+    const url=auditUrl(window.location.origin,window.location.pathname,createPaymentAudit(request,hash));
+    await copyPublicUrl(url);
+  }catch(err){error(explainHostError(err));}
+}
+async function onTenantEvidence(form:HTMLFormElement):Promise<void>{
+  if(tenantVerifyBusy||!tenantRequest)return;
+  tenantHash=formValue(form,'hash');
+  tenantVerifyResult=null;
+  tenantVerifyBusy=true;render();
+  try{
+    tenantVerifyResult=await verifyNimTransaction({hash:tenantHash,
+      recipient:tenantRequest.recipient,memo:tenantRequest.memo,
+      amountLuna:tenantRequest.amountLuna,allowPartial:true});
+  }catch{tenantVerifyResult=null;error('RPC verification could not complete. No rent credit granted.');}
+  finally{tenantVerifyBusy=false;render();}
+}
+async function onAuditRecheck():Promise<void>{
+  if(!publicAudit||publicAuditBusy)return;
+  publicAuditBusy=true;publicAuditResult=null;render();
+  try{
+    publicAuditResult=await verifyNimTransaction({hash:publicAudit.txHash,
+      recipient:publicAudit.request.recipient,memo:publicAudit.request.memo,
+      amountLuna:publicAudit.request.amountLuna,allowPartial:true});
+  }catch{publicAuditResult=null;error('Unable to recheck the public node. No rent credit granted.');}
+  finally{publicAuditBusy=false;render();}
 }
 async function onRpcCheck():Promise<void>{
   if(rpcChecking)return;
