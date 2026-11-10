@@ -23,6 +23,7 @@ export interface SmokeContext {
   walletApprovalAcknowledged: boolean;
   priorAttemptUnresolved: boolean;
   recipient: string;
+  allowlistedRecipient: string | null;
   memo: string;
 }
 export interface SmokeAssessment { allowed: boolean; reasons: string[]; }
@@ -55,6 +56,10 @@ export function assessSmokePayment(ctx: SmokeContext): SmokeAssessment {
   }
   if(!/^NQ[0-9]{2}[0-9A-HJ-NP-VX-Y]{32}$/.test(ctx.recipient.replace(/\s+/g,'').toUpperCase())){
     reasons.push('Recipient address structure is invalid.');
+  }
+  if(typeof ctx.allowlistedRecipient!=='string' ||
+     ctx.recipient.replace(/\s+/g,'').toUpperCase()!==ctx.allowlistedRecipient.replace(/\s+/g,'').toUpperCase()){
+    reasons.push('Recipient is not the explicitly approved test wallet address.');
   }
   if(!/^RR1:[0-9a-f]{32}$/.test(ctx.memo)) reasons.push('Only opaque rent references are allowed.');
   if(!ctx.recipientCheckAcknowledged) reasons.push('Confirm recipient with the payee outside this unsigned link.');
