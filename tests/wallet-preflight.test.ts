@@ -5,7 +5,10 @@ import { inspectWalletAddresses, receivingAddressAssessment, MAX_SHARED_ACCOUNTS
 const a='NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 const b='NQ01 1111 1111 1111 1111 1111 1111 1111 1111';
 function provider(addresses:string[]=[a],balances:Record<string,number>={}):WalletReadProvider{
- return {async listAccounts(){return addresses;},async getBalance(address){return Object.hasOwn(balances,address)?balances[address]:100_000;}};
+ return {async listAccounts(){return addresses;},async getBalance(address){
+ const key=Object.keys(balances).find(k=>k.replace(/\s+/g,'')===address.replace(/\s+/g,''));
+ return key===undefined?100_000:balances[key];
+}};
 }
 test('explicit read-only request receives address and one NIM balance in Luna',async()=>{
  const x=await inspectWalletAddresses(provider([a],{[a]:100_000}),'mainnet',1794271800000);
