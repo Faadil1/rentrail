@@ -166,6 +166,7 @@ function overview(p: Portfolio): string {
       <div class="metric"><div class="metric-top"><span>Active units</span>${icon('home')}</div><strong>${p.units.length}</strong><span class="metric-foot">Across ${p.properties.length} properties</span></div>
       <div class="metric"><div class="metric-top"><span>Unverified sends</span>${icon('clock')}</div><strong>${submitted}</strong><span class="metric-foot">Never counted as rent paid</span></div>
     </div>
+    <div class="release-notice"><strong>Public verification edition · Cycle III</strong><p>Organize local rent invoices, check the Nimiq Pay wallet, and verify already-completed NIM payments with a public mainnet history node. <b>This public edition cannot initiate payments.</b> The first user-approved pilot succeeded on-chain but its native wallet dialog rounded 0.005 NIM to 0.01 NIM: that discrepancy remains under investigation.</p><button class="tertiary" data-nav="wallet">Check wallet &amp; verify an existing transfer ${icon('arrow')}</button></div>
     ${periodCockpit(p)}
     <section class="section"><div class="section-heading"><div><div class="eyebrow">YOUR WORKSPACE</div><h2>Recent obligations</h2></div><button class="tertiary" data-nav="charges">View all ${icon('arrow')}</button></div>
       ${chargeCards || emptyState('No rent charges yet','Create a property and unit, then issue your first monthly rent request.','properties','Create a property')}
@@ -409,7 +410,7 @@ function render():void {
   const p=activePortfolio();
   const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),wallet:walletView() + g3Panel(p)})[selectedView];
   root!.innerHTML=`<div class="app-shell ${tenantRequest||publicAudit||publicAuditError?'tenant-shell':''}">
-    <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>WORKING NAME</small></span></a>
+    <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>CYCLE III · PAY</small></span></a>
       <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('wallet','Wallet gate','wallet')}</nav>
       <div class="sidebar-bottom"><div class="side-note">${icon('shield')}<span>Non-custodial<br/><small>Evidence-first payments</small></span></div><div class="sidebar-footer">CYCLE III · PAY<br/>2026 BUILD</div></div>
     </aside><div class="main-wrap"><header class="topbar"><div class="mobile-brand">R<span>·</span><small>rentrail</small></div><span class="topbar-caption">${publicAudit?'RENT EVIDENCE':tenantRequest?'RENT PAYMENT':selectedView.toUpperCase()}</span><div class="topbar-right"><span class="label-chip">${preview?'EXAMPLE PREVIEW':'LOCAL WORKSPACE'}</span>${walletIndicator()}</div></header>
