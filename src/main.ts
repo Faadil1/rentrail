@@ -170,6 +170,14 @@ function walletIndicator(): string {
   const description = hostStatus==='connected' ? (check?.consensus ? 'SDK connected' : 'SDK / no consensus') : hostStatus==='checking' ? 'Checking host…' : 'Host not verified';
   return `<div class="wallet-state"><span class="status-light ${hostStatus==='connected'&&check?.consensus?'online':''}"></span><span>${escapeHtml(description)}</span></div>`;
 }
+function liveProjectionMap(p:Portfolio):Record<string,ReturnType<typeof projectCharge>>{
+  const result:Record<string,ReturnType<typeof projectCharge>>={};
+  for(const c of p.charges){
+    if(claimsForCharge(proofClaims,c.id).length)
+      result[c.id]=reconcileClaimedCharge(c,proofClaims,liveProofChecks,p.submissions).summary;
+  }
+  return result;
+}
 function overview(p: Portfolio): string {
   const sum = p.charges.reduce((n,c)=>n+c.amountLuna,0);
   const submitted = p.charges.filter(c=>p.submissions.some(s=>s.chargeId===c.id)).length;
@@ -189,7 +197,7 @@ function overview(p: Portfolio): string {
 }
 function periodCockpit(p:Portfolio):string {
   const activeFilter=p.properties.some(x=>x.id===filterProperty)?filterProperty:'';
-  const snap=monthSnapshot(p,workspaceMonth,activeFilter);
+  const snap=monthSnapshot(p,workspaceMonth,activeFilter,liveProjectionMap(p));
   const options=p.properties.map(x=>`<option value="${escapeHtml(x.id)}" ${activeFilter===x.id?'selected':''}>${escapeHtml(x.name)}</option>`).join('');
   const monthlyLines=snap.lines.slice(0,8).map(line=>`<div class="period-line">
     <div><strong>${escapeHtml(line.unitLabel)}</strong><small>${escapeHtml(line.propertyName)}</small></div>
@@ -232,7 +240,7 @@ function emptyState(title:string, description:string, goto:View, action:string):
 function chargeRow(p:Portfolio,c:Charge):string {
   const unit = p.units.find(u=>u.id===c.unitId);
   const property = p.properties.find(b=>b.id===unit?.propertyId);
-  const calculated=projectCharge(c,[],p.submissions);
+  const calculated=claimsForCharge(proofClaims,c.id).length?reconcileClaimedCharge(c,proofClaims,liveProofChecks,p.submissions).summary:projectCharge(c,[],p.submissions);
   return `<div class="charge-row"><div class="charge-avatar">${icon('home')}</div><div class="charge-title"><b>${normalizeLabel(unit?.label||'Unknown unit')}</b><span>${normalizeLabel(property?.name||'Unknown property')} · ${escapeHtml(c.period)}</span></div><div class="charge-amount"><strong>${formatNim(c.amountLuna)} NIM</strong><span class="tag ${statusClass(calculated.status)}">${statusText(calculated.status)}</span></div><button class="tiny" type="button" data-share="${escapeHtml(c.id)}" ${preview?'disabled title="Example data cannot be shared"':''}>${icon('link')}<span> Request</span></button></div>`;
 }
 function propertiesView(p:Portfolio):string {
@@ -256,6 +264,7 @@ function chargesView(p:Portfolio):string {
     <button class="primary" type="submit" ${preview||!p.units.length?'disabled':''}>${icon('plus')} Create obligation</button>
   </form></section><section class="stack"><div class="section-heading"><h2>Rent requests</h2><span class="count">${p.charges.length}</span></div>${p.charges.length?p.charges.slice().reverse().map(c=>chargeRow(p,c)).join(''):emptyState('No obligations recorded','Create a property and a unit before issuing a request.','properties','Set up property')}</section></div>
   ${renewalPlanner(p)}
+  <div class="release-notice"><strong>Close the rent loop</strong><p>Track NIM transaction hashes for each month's rent. Recheck partial payments, calculate remaining balances and share a fresh-checkable statement. Stored hashes are not settlement proofs.</p><button class="tertiary" data-nav="reconcile">Open Reconciliation Desk ${icon('arrow')}</button></div>
   <div class="safety"><span>${icon('shield')}</span><div><strong>Sending is not settlement.</strong><p>All requests start OPEN. Any wallet-submitted hash remains unverified until independent chain verification is implemented.</p></div></div>`;
 }
 function walletInventoryPanel():string {
