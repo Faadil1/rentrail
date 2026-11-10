@@ -97,3 +97,10 @@
 .account-note{font-size:12px;line-height:1.6;color:#60748e;margin:13px 0 0}
 .smoke-panel .account-note{background:#f0f6ff;border-radius:10px;padding:11px;margin:0}
 @media(max-width:480px){.wallet-inventory{padding:15px 12px}.account-row{align-items:flex-start;flex-direction:column;gap:10px}.account-row button{width:100%;justify-content:center}}
+
+/* Cycle III public, read-only release disclosure — prominent without modal friction. */
+.release-notice{margin:14px 0 20px;padding:16px 20px;background:#f1f6ff;border:1px solid #c8daf7;border-radius:16px;box-shadow:0 4px 12px rgba(24,59,112,.04)}
+.release-notice strong{display:block;color:#163d7e;font-size:14px;font-weight:750;letter-spacing:.02em}
+.release-notice p{margin:8px 0 12px;color:#344d6c;font-size:13px;line-height:1.63;max-width:75ch}
+.release-notice button{margin:3px 0 0}
+@media(max-width:650px){.release-notice{padding:14px;margin-top:12px}.release-notice p{font-size:12.5px}}
