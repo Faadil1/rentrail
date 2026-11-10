@@ -55,3 +55,9 @@
 @media(max-width:1000px){.period-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.period-cockpit,.renewal-panel{padding:17px 14px}.period-cockpit .section-heading{flex-direction:column;gap:6px}.period-filters{grid-template-columns:1fr 1fr}.period-metrics{gap:8px}.period-metrics>div{padding:12px 10px}.period-line{align-items:flex-start}.period-line strong{font-size:12px}.period-line small{font-size:10px}.period-actions .tertiary{width:100%;justify-content:center}.renewal-actions button{width:100%;justify-content:center}}
 @media(max-width:365px){.period-filters{grid-template-columns:1fr}.period-metrics{grid-template-columns:1fr 1fr}}
+
+
+.g3-amount-note{margin:12px 0;padding:14px 15px;border-left:3px solid #528bc0;background:#f2f7fb;border-radius:8px;line-height:1.5}
+.g3-amount-note strong{display:block;color:#203958;font-size:13px}
+.g3-amount-note p{margin:5px 0;font-size:12px;color:#37485c}
+.g3-amount-note small{display:block;font-size:11px;color:#65798f}
