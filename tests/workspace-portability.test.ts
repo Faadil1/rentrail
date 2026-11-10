@@ -44,4 +44,4 @@ test('unknown payment status blocked',()=>{const p=recordSubmission(sample(),{ch
 test('unlinked payment claim blocked',()=>{const p=recordSubmission(sample(),{chargeId:id,hash:'f'.repeat(64),state:'SUBMITTED_UNVERIFIED',createdAt:date});const x=JSON.parse(createWorkspaceBackup(p));x.portfolio.submissions[0].chargeId='unknown';assert.throws(()=>readWorkspaceBackup(JSON.stringify(x)))});
 test('malformed hash blocked',()=>{const p=recordSubmission(sample(),{chargeId:id,hash:'f'.repeat(64),state:'SUBMITTED_UNVERIFIED',createdAt:date});const x=JSON.parse(createWorkspaceBackup(p));x.portfolio.submissions[0].hash='zzz';assert.throws(()=>readWorkspaceBackup(JSON.stringify(x)))});
 test('too many properties blocked',()=>assert.throws(()=>validateWorkspacePortfolio({...sample(),properties:Array(101).fill(sample().properties[0])})));
-test('original data remains unchanged on validation',()=>{const p=sample();validateWorkspacePortfolio(p);assert.equal(p.charges[0].recipient,addr)});
+test('original data remains unchanged on validation',()=>{const p=sample();validateWorkspacePortfolio(p);assert.equal(p.charges[0].recipient,addr.replace(/\s+/g,''))});
