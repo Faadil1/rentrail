@@ -11,7 +11,7 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@nimiq/mini-app-sdk": "^0.2.1"
+    "@nimiq/mini-app-sdk": "^0.2.4"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
