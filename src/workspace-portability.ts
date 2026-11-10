@@ -28,7 +28,7 @@ export function validateWorkspacePortfolio(raw:unknown):Portfolio{
  if(!units.every(u=>validId(u.id)&&buildingIds.has(u.propertyId)&&field(u.label,60))||!unique(units.map(u=>String(u.id))))return fail('invalid, missing-property or duplicate units');
  const unitIds=new Set(units.map(u=>u.id));
  if(!charges.every(c=>{
-   if(!validId(c.id)||!/^[a-f0-9]{32}$/.test(String(c.id))||!unitIds.has(c.unitId)||!Number.isSafeInteger(c.amountLuna)||!isSafeLuna(c.amountLuna)||
+   if(!validId(c.id)||!/^[a-f0-9]{32}$/.test(String(c.id))||!unitIds.has(c.unitId)||typeof c.amountLuna!=='number'||!isSafeLuna(c.amountLuna)||
    typeof c.recipient!=='string'||!looksLikeNimiqAddress(c.recipient)||!validDate(c.createdAt)||typeof c.period!=='string')return false;
    try{assertPeriod(c.period);return c.memo===makeMemo(c.id)}catch{return false}
  })||!unique(charges.map(c=>String(c.id)))||!unique(charges.map(c=>String(c.memo)))||
