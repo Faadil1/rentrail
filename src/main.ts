@@ -1,6 +1,7 @@
 import './styles.css';
 import {createWorkspaceBackup,readWorkspaceBackup,backupSummary,type PortableWorkspace} from './workspace-portability.ts';
 import {buildCollectionQueue} from './collections-queue.ts';
+import {loadCasebook,persistCasebook,saveObservedMatch,casebookSummary} from './evidence-casebook.ts';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
@@ -252,6 +253,22 @@ function collectionOperationsPanel(p:Portfolio):string{
    <div class="collection-actions"><button class="tertiary" type="button" data-nav="wallet">Verify transaction proofs ${icon('arrow')}</button></div>
  </section>`;
 }
+function chainEvidenceCasebook(p:Portfolio):string{
+ const journal=loadCasebook(p);
+ const rows=p.charges.slice().reverse().map(charge=>{
+  const matches=journal.entries.filter(e=>e.chargeId===charge.id);
+  if(!matches.length)return '';
+  const summary=casebookSummary(journal,p,charge.id);
+  const preview=matches.map(e=>`<div class="casebook-line"><span class="mono">${escapeHtml(e.hash.slice(0,12))}…${escapeHtml(e.hash.slice(-8))}</span><span>${formatNim(e.amountLuna)} NIM</span><small>${escapeHtml(e.observedAt.slice(0,16))} UTC · one RPC · block ${e.blockHeight}</small></div>`).join('');
+  return `<div class="casebook-entry"><strong>${escapeHtml(charge.period)} · ${escapeHtml(charge.memo.slice(0,13))}…</strong><p>${matches.length} node-reported observation(s), ${formatNim(summary.observedLuna)} NIM total previously matched. ${formatNim(summary.unmatchedLuna)} NIM still unmatched to local invoice by these snapshots. This is not a legal rent receipt.</p>${preview}</div>`;
+ }).filter(Boolean).join('');
+ return `<section class="panel casebook-panel" aria-label="Historical public-chain observations">
+   <div class="eyebrow">PAYMENT EVIDENCE · LOCAL CASEBOOK</div><h3>Chain evidence, saved with its source</h3>
+   <p>After independently verifying a hash, you may save the node-reported match for your monthly records. A saved observation retains its amount, date, transaction hash and canonical block heights. It is <strong>not continuously refreshed</strong>, not an ownership proof, and never marks rent legally paid. Recheck the hash before relying on it.</p>
+   ${rows||'<div class="empty-period">No node-reported matches saved yet. Verify an existing transfer under Wallet gate, then explicitly save its observation.</div>'}
+   <button class="tertiary" type="button" data-nav="wallet">Verify a transaction hash ${icon('arrow')}</button>
+ </section>`;
+}
 function portableWorkspacePanel(p:Portfolio):string {
  const counts=backupSummary(p);
  const restore=importCandidate?backupSummary(importCandidate.portfolio):null;
@@ -279,6 +296,7 @@ function chargesView(p:Portfolio):string {
     <button class="primary" type="submit" ${preview||!p.units.length?'disabled':''}>${icon('plus')} Create obligation</button>
   </form></section><section class="stack"><div class="section-heading"><h2>Rent requests</h2><span class="count">${p.charges.length}</span></div>${p.charges.length?p.charges.slice().reverse().map(c=>chargeRow(p,c)).join(''):emptyState('No obligations recorded','Create a property and a unit before issuing a request.','properties','Set up property')}</section></div>
   ${collectionOperationsPanel(p)}
+  ${chainEvidenceCasebook(p)}
   ${renewalPlanner(p)}
   ${portableWorkspacePanel(p)}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Sending is not settlement.</strong><p>All requests start OPEN. Any wallet-submitted hash remains unverified until independent chain verification is implemented.</p></div></div>`;
@@ -336,6 +354,8 @@ function g3Panel(p:Portfolio):string {
     ${txResult}
     ${txVerifiedChargeId===txChargeId && txVerifyResult && p.charges.some(x=>x.id===txChargeId)?observedTransferAmount(shareableRequest(p.charges.find(x=>x.id===txChargeId)!),txVerifyResult):''}
     ${txVerifyResult?.state==='FINAL_MATCHED' && txVerifiedChargeId===txChargeId?'<button id="g3-copy-audit" class="tertiary" type="button">Copy independent recheck link</button>':''}
+    ${txVerifyResult?.state==='FINAL_MATCHED' && txVerifiedChargeId===txChargeId?'<button id="g3-save-observation" class="tertiary" type="button">Save this RPC-reported match to local casebook</button>':''}
+    <small>Saved casebook entries are historical reports from one public node, not fresh chain attestation. Never treat them as legal rent receipts or verified landlord identity.</small>
     <div class="safety"><span>${icon('shield')}</span><div><strong>Payment sends remain locked.</strong><p>Nothing here sends NIM, stores wallet secrets, or marks rent paid automatically.</p></div></div>
   </section>`;
 }
@@ -551,6 +571,15 @@ function bindEvents():void {
   root!.querySelector('#audit-recheck')?.addEventListener('click',()=>void onAuditRecheck());
   root!.querySelector('#tenant-copy-audit')?.addEventListener('click',()=>void onCopyAudit('tenant'));
   root!.querySelector('#g3-copy-audit')?.addEventListener('click',()=>void onCopyAudit('owner'));
+  root!.querySelector('#g3-save-observation')?.addEventListener('click',()=>{
+    if(preview||txVerifyResult?.state!=='FINAL_MATCHED'||txVerifiedChargeId!==txChargeId)return;
+    try{
+      const book=saveObservedMatch(loadCasebook(portfolio),portfolio,txChargeId,txVerifyResult);
+      persistCasebook(book,portfolio);
+      success('A node-reported match was saved as historical evidence. Recheck before relying on it.');
+    }catch(err){error(err instanceof Error?err.message:'Could not save observation.');}
+  });
+
   root!.querySelector('#g3-network')?.addEventListener('click',()=>void onRpcCheck());
   const g3Form=root!.querySelector<HTMLFormElement>('#g3-verify-form');
   g3Form?.addEventListener('submit',e=>{e.preventDefault();void onVerifyG3(g3Form);});
