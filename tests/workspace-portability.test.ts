@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {addCharge,addProperty,addUnit,emptyPortfolio,makeMemo,recordSubmission,type Portfolio} from '../src/domain.ts';
 import {backupSummary,createWorkspaceBackup,readWorkspaceBackup,validateWorkspacePortfolio} from '../src/workspace-portability.ts';
+import {saveObservedMatch} from '../src/evidence-casebook.ts';
+import type {VerifyResult} from '../src/rpc.ts';
 const id='a'.repeat(32), addr='NQ07 0000 0000 0000 0000 0000 0000 0000 0000',date='2026-11-10T00:00:00Z';
 function sample():Portfolio{
  let p=emptyPortfolio();p=addProperty(p,{id:'p1',name:'Example complex',createdAt:date});
@@ -45,3 +47,25 @@ test('unlinked payment claim blocked',()=>{const p=recordSubmission(sample(),{ch
 test('malformed hash blocked',()=>{const p=recordSubmission(sample(),{chargeId:id,hash:'f'.repeat(64),state:'SUBMITTED_UNVERIFIED',createdAt:date});const x=JSON.parse(createWorkspaceBackup(p));x.portfolio.submissions[0].hash='zzz';assert.throws(()=>readWorkspaceBackup(JSON.stringify(x)))});
 test('too many properties blocked',()=>assert.throws(()=>validateWorkspacePortfolio({...sample(),properties:Array(101).fill(sample().properties[0])})));
 test('original data remains unchanged on validation',()=>{const p=sample();validateWorkspacePortfolio(p);assert.equal(p.charges[0].recipient,addr.replace(/\s+/g,''))});
+test('portable JSON roundtrip carries source-attributed historic casebook observations',()=>{
+ const p=sample();
+ const proof:VerifyResult={state:'FINAL_MATCHED',message:'Node reported',evidenceSource:'single-public-rpc',
+  rpcUrl:'https://rpc.nimiqwatch.com/',observedAt:date,hash:'d'.repeat(64),
+  network:'MainAlbatross',blockHeight:66504678,macroHeight:66504720,amountLuna:500};
+ const book=saveObservedMatch({version:1,entries:[]},p,id,proof);
+ const restored=readWorkspaceBackup(createWorkspaceBackup(p,date,book));
+ assert.equal(restored.casebook?.entries.length,1);
+ assert.equal(restored.casebook?.entries[0].source,'single-public-rpc');
+});
+test('imported false paid casebook is rejected rather than elevated to evidence',()=>{
+ const p=sample();
+ const raw=JSON.parse(createWorkspaceBackup(p,date));
+ raw.casebook={version:1,entries:[{chargeId:id,hash:'d'.repeat(64),amountLuna:500,observedAt:date,
+   rpcUrl:'https://rpc.nimiqwatch.com/',network:'MainAlbatross',blockHeight:66504678,
+   macroHeight:66504720,source:'LEGAL_RECEIPT'}]};
+ assert.throws(()=>readWorkspaceBackup(JSON.stringify(raw)),/observation/);
+});
+test('earlier v1 portable export without casebook stays readable',()=>{
+ const result=readWorkspaceBackup(createWorkspaceBackup(sample(),date));
+ assert.equal(result.casebook,undefined);
+});
