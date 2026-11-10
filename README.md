@@ -28,7 +28,7 @@ Evidence and caveats: [G2 pilot ledger](docs/G2_PILOT_500_LUNA.md), [full scorin
 ### Important limitations (as of Cycle III)
 
 - **Public build is read-only for money movement.** The sole user-authorized 500-Luna wallet-send pilot was in a dedicated access-protected deployment, **not** this public preview. No further transfers are authorized by this release.
-- The pilot native confirmation UI displayed **0.01 NIM** while the final mainnet transfer contained **0.005 NIM**. This unresolved display discrepancy must not be hidden or treated as an accepted payment UX.
+- The pilot native confirmation UI displayed **0.01 NIM** while mainnet recorded **0.005 NIM**. Source inspection of the upstream open-source Nimiq Pay confirmation and currency formatter identified a likely **two-decimal presentation rounding** path; **no upstream fix has been verified**. See [precision bug analysis](docs/UPSTREAM_NIMIQ_PAY_AMOUNT_PRECISION.md).
 - Verification uses a **single public RPC node** and may fail if that node is unavailable; it is not independently replicated cryptographic proof.
 - The landlord/tenant request URL is **not signed** and can be altered by its sender. Nimiq address checksum validation prevents typing errors, not impersonation.
 - Portfolio records are **local to the device/browser** and do not automatically synchronize with other tenants/landlords.
@@ -58,7 +58,7 @@ Nimiq Pay SDK: `@nimiq/mini-app-sdk`. Mainnet independent read-only history node
 | One real user-approved mainnet 500-Luna transfer | **PASS** |
 | One public history node reports exact matching and later macroblock | **PASS_WITH_SINGLE_NODE_CAVEAT** |
 | Destination wallet acknowledges receipt | **USER_CONFIRMED** |
-| Native wallet amount shown correctly | **OPEN BUG — 0.01 vs 0.005 NIM** |
+| Native wallet amount shown correctly | **OPEN BUG — 0.01 vs 0.005 NIM; upstream 2-decimal formatter identified** |
 | General reusable public direct-payment sending | **DISABLED** |
 | Actual rent / multi-property multi-party adoption | **NOT TESTED** |
 | Official Nimiq Cycle III submission | **NOT YET VERIFIED** |
