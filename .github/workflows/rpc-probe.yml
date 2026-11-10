@@ -1,0 +1,17 @@
+name: Read-only Nimiq RPC shape probe
+on:
+  push:
+    branches: ['feat/rpc-g3-readonly']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rpc-shape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/rpc-probe.mjs

@@ -1,0 +1,19 @@
+name: Mini App CI
+on:
+  push:
+    branches: [main, "feat/**", "fix/**", "release/**"]
+  pull_request:
+    branches: [main, "docs/**"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # First PR has no npm lockfile because this environment cannot reach npm.
+      # Subsequent PRs should check in package-lock.json and switch to npm ci.
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
