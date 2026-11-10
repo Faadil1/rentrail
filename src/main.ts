@@ -254,6 +254,7 @@ function g3Panel(p:Portfolio):string {
     </form>
     ${!charges.length?'<div class="inline-alert">Create an actual local rent obligation before checking a transaction. Fictional example charges are never verified as real.</div>':''}
     ${txResult}
+    ${txVerifiedChargeId===txChargeId && txVerifyResult && p.charges.some(x=>x.id===txChargeId)?observedTransferAmount(shareableRequest(p.charges.find(x=>x.id===txChargeId)!),txVerifyResult):''}
     ${txVerifyResult?.state==='FINAL_MATCHED' && txVerifiedChargeId===txChargeId?'<button id="g3-copy-audit" class="tertiary" type="button">Copy independent recheck link</button>':''}
     <div class="safety"><span>${icon('shield')}</span><div><strong>Payment sends remain locked.</strong><p>Nothing here sends NIM, stores wallet secrets, or marks rent paid automatically.</p></div></div>
   </section>`;
@@ -283,6 +284,12 @@ function tenantView(request:SharedRequest):string {
     ${outcomeUnknown?`<div class="pending-result"><strong>Outcome unknown — DO NOT retry yet</strong><p>Inspect Nimiq Pay transaction history and independently verify on-chain before attempting another payment.</p></div>`:''}
   </div>${tenantEvidencePanel(request)}<p class="checkout-foot">RentRail is non-custodial. Payment approval happens inside Nimiq Pay, never in this page.</p></div>`;
 }
+function observedTransferAmount(request: SharedRequest, result: VerifyResult | null): string {
+  if(result?.state!=='FINAL_MATCHED'||typeof result.amountLuna!=='number')return '';
+  const partial=result.amountLuna<request.amountLuna;
+  const heading=partial?'Partial transfer observed':'Full requested amount observed in this transaction';
+  return `<div class="g3-amount-note"><strong>${heading}</strong><p>${formatNim(result.amountLuna)} NIM reported in this transaction, against ${formatNim(request.amountLuna)} NIM requested.</p><small>${partial?'Additional transfers may exist. This is not a verified remaining balance or a rent receipt.':'This does not prove the recipient owns the address or that the rental contract is legally settled.'}</small></div>`;
+}
 function tenantEvidencePanel(request: SharedRequest): string {
   const result=tenantVerifyResult ? `<div class="g3-result" role="status"><strong>${tenantVerifyResult.state==='FINAL_MATCHED'?'Public node reports matching finality':escapeHtml(tenantVerifyResult.state.replaceAll('_',' '))}</strong><p>${escapeHtml(tenantVerifyResult.message)}</p><small>Checked ${escapeHtml(tenantVerifyResult.observedAt)}</small></div>`:'';
   return `<section class="checkout-card evidence-card">
@@ -293,6 +300,7 @@ function tenantEvidencePanel(request: SharedRequest): string {
       <button class="primary full" ${tenantVerifyBusy?'disabled':''} type="submit">${tenantVerifyBusy?'Checking…':'Verify transaction'} ${icon('arrow')}</button>
     </form>
     ${result}
+    ${observedTransferAmount(request,tenantVerifyResult)}
     ${tenantVerifyResult?.state==='FINAL_MATCHED'?'<button id="tenant-copy-audit" class="tertiary full" type="button">Copy shareable recheck link</button>':''}
     <small>Any link can be modified. This is not proof of the landlord's identity, nor legal confirmation that rent is paid. A fresh independent check is required by each viewer.</small>
   </section>`;
@@ -311,6 +319,7 @@ function independentAuditView(audit:PublicPaymentAudit):string {
     <div class="detail"><span>Transaction to check</span><strong class="mono">${escapeHtml(audit.txHash)}</strong></div>
     <button id="audit-recheck" class="primary full" ${publicAuditBusy?'disabled':''} type="button">${publicAuditBusy?'Checking public RPC…':'Recheck blockchain independently'} ${icon('arrow')}</button>
     ${status}
+    ${observedTransferAmount(r,publicAuditResult)}
     <div class="inline-alert">This public link is <strong>not digitally signed</strong> and can be modified. Confirm recipient ownership with the landlord independently. A blockchain match is not proof that a legal rental obligation is discharged.</div>
     <a class="tertiary" href="/">Back to RentRail</a>
   </section></div>`;
