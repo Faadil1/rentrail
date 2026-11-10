@@ -555,6 +555,13 @@ function bindEvents():void {
   root!.querySelector('#audit-recheck')?.addEventListener('click',()=>void onAuditRecheck());
   root!.querySelector('#tenant-copy-audit')?.addEventListener('click',()=>void onCopyAudit('tenant'));
   root!.querySelector('#g3-copy-audit')?.addEventListener('click',()=>void onCopyAudit('owner'));
+  root!.querySelector('#desk-charge-selector')?.addEventListener('change',e=>{deskChargeId=(e.target as HTMLSelectElement).value;deskMessage='';render();});
+  const claimForm=root!.querySelector<HTMLFormElement>('#desk-add-claim');
+  claimForm?.addEventListener('submit',e=>{e.preventDefault();onAddProofClaim(claimForm);});
+  root!.querySelectorAll<HTMLButtonElement>('[data-remove-proof]').forEach(btn=>btn.addEventListener('click',()=>onRemoveProofClaim(btn.dataset.removeProof||'')));
+  root!.querySelector('#desk-recheck-all')?.addEventListener('click',()=>void onRecheckDesk());
+  root!.querySelector('#desk-share-statement')?.addEventListener('click',()=>void onShareStatement());
+  root!.querySelector('#recheck-statement')?.addEventListener('click',()=>void onRecheckPublicStatement());
   root!.querySelector('#g3-network')?.addEventListener('click',()=>void onRpcCheck());
   const g3Form=root!.querySelector<HTMLFormElement>('#g3-verify-form');
   g3Form?.addEventListener('submit',e=>{e.preventDefault();void onVerifyG3(g3Form);});
