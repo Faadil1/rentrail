@@ -7,7 +7,8 @@ RentRail is a **Nimiq Pay Mini App** for tenant/landlord payment coordination. P
 
 ## Try the app
 
-**Public read-only Mini App:** deployment URL will be inserted once its exact release SHA and iPhone runtime are confirmed.
+**Public, non-production read-only Mini App (READY build):** https://rentrail-operations-staging-bqetxdq5d-faadil1s-projects.vercel.app/  
+Exact deployed app SHA: `f3412c2575918d2ee1297e686ba642dc91ea0130`, Vercel deployment `dpl_3y4ZrTRjRMN1x4Hw1Q74rtScobRQ` (**staging**, READY). **217/217 automated tests passed**. This new release SHA still needs a fresh native Nimiq Pay iPhone acceptance test; earlier G2 pilot ran successfully on a different SHA.
 
 Inside **Nimiq Pay → Mini Apps → Custom URL**, paste the HTTPS URL. The browser preview also works for non-wallet management features.
 
