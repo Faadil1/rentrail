@@ -8,6 +8,9 @@ import { type SharedRequest } from './domain.ts';
  */
 export const PILOT_LUNA=500;
 export const PILOT_PERIOD='2026-11';
+// Automatic sunset shortly before the hackathon submission cutoff.
+// Device clocks are not trusted security boundaries; isolate and disable this deployment after the test.
+export const PILOT_EXPIRES_AT_MS = Date.parse('2026-11-11T23:45:00Z');
 export interface PilotConfig {
   recipient: string | undefined;
   chargeId: string | undefined;
@@ -16,8 +19,9 @@ export interface PilotConfig {
 }
 export interface PilotCheck { allowed:boolean; reasons:string[] }
 
-export function checkPilotRequest(request: SharedRequest, config: PilotConfig):PilotCheck {
+export function checkPilotRequest(request: SharedRequest, config: PilotConfig, nowMs=Date.now()):PilotCheck {
   const reasons:string[]=[];
+  if(!Number.isFinite(nowMs)||nowMs>=PILOT_EXPIRES_AT_MS)reasons.push('The authorized one-off pilot has expired. Payments are disabled.');
   if(config.amountLuna!=='500'||request.amountLuna!==PILOT_LUNA)
     reasons.push('Only the explicitly approved amount of 0.005 NIM (500 Luna) is permitted.');
   if(config.period!==PILOT_PERIOD||request.period!==PILOT_PERIOD)
