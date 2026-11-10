@@ -9,6 +9,7 @@ function ready(overrides:Partial<SmokeContext>={}):SmokeContext{
  amountLuna:500,recipientCheckAcknowledged:true,realMoneyAcknowledged:true,
  walletApprovalAcknowledged:true,priorAttemptUnresolved:false,
  recipient:'NQ07 0000 0000 0000 0000 0000 0000 0000 0000',
+ allowlistedRecipient:'NQ07 0000 0000 0000 0000 0000 0000 0000 0000',
  memo:'RR1:0123456789abcdef0123456789abcdef',...overrides};
 }
 const rejected=(overrides:Partial<SmokeContext>)=>assert.equal(assessSmokePayment(ready(overrides)).allowed,false);
