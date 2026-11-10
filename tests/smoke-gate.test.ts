@@ -10,6 +10,7 @@ function ready(overrides:Partial<SmokeContext>={}):SmokeContext{
  walletApprovalAcknowledged:true,priorAttemptUnresolved:false,
  recipient:'NQ07 0000 0000 0000 0000 0000 0000 0000 0000',
  allowlistedRecipient:'NQ07 0000 0000 0000 0000 0000 0000 0000 0000',
+ sharedPayerAddresses:['NQ01 1111 1111 1111 1111 1111 1111 1111 1111'],
  memo:'RR1:0123456789abcdef0123456789abcdef',...overrides};
 }
 const rejected=(overrides:Partial<SmokeContext>)=>assert.equal(assessSmokePayment(ready(overrides)).allowed,false);
@@ -45,3 +46,9 @@ test('no wallet-only consensus fallback',()=>rejected({publicRpcObservedAt:null}
 test('missing build recipient allowlist prevents sending',()=>rejected({allowlistedRecipient:null}));
 test('recipient that differs from allowlist prevents sending',()=>rejected({allowlistedRecipient:'NQ01 1111 1111 1111 1111 1111 1111 1111 1111'}));
 test('allowlist compares normalized addresses',()=>assert.equal(assessSmokePayment(ready({allowlistedRecipient:'nq0700000000000000000000000000000000'})).allowed,true));
+test('mainnet smoke test blocked until wallet account list is granted',()=>rejected({sharedPayerAddresses:null}));
+test('empty wallet account list cannot authorize a transfer',()=>rejected({sharedPayerAddresses:[]}));
+test('wallet payer and recipient matching exactly are blocked as self-transfer',()=>rejected({sharedPayerAddresses:['NQ07 0000 0000 0000 0000 0000 0000 0000 0000']}));
+test('payer and recipient matching without spaces are still blocked',()=>rejected({sharedPayerAddresses:['NQ0700000000000000000000000000000000']}));
+test('recipient appearing among two shared wallet addresses is blocked',()=>rejected({sharedPayerAddresses:['NQ01 1111 1111 1111 1111 1111 1111 1111 1111','NQ07 0000 0000 0000 0000 0000 0000 0000 0000']}));
+test('unrecognized payer address format blocks instead of assuming safe recipient',()=>rejected({sharedPayerAddresses:['invalid']}));
