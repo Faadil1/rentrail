@@ -57,21 +57,24 @@ export function collectionQueue(portfolio:Portfolio,asOf:string,dueDays:DueDays=
       ? 'NODE_MATCH_THIS_SESSION'
       : projection.status==='REVIEW_REQUIRED'?'NODE_REVIEW_REQUIRED'
       : hasSubmittedHash?'TX_NEEDS_VERIFICATION':'OPEN_LOCAL';
-    const outstanding=projection.dueLuna;
+    // A duplicate/overpay/mismatch means the entire local request stays under review.
+    // Never subtract a partially credited observation from the review queue.
+    const effectiveCredited=projection.status==='REVIEW_REQUIRED'?0:projection.creditedLuna;
+    const outstanding=projection.status==='REVIEW_REQUIRED'?charge.amountLuna:projection.dueLuna;
     if(!Number.isSafeInteger(outstandingLuna+outstanding)||!Number.isSafeInteger(buckets[bucket].luna+outstanding))
       throw Error('Portfolio total exceeds supported Luna precision.');
     outstandingLuna+=outstanding;
     buckets[bucket].luna+=outstanding;buckets[bucket].count++;
     if(difference>0){overdueCount++;if(!Number.isSafeInteger(overdueLuna+outstanding))throw Error('Overdue total overflow');overdueLuna+=outstanding;}
     if(hasSubmittedHash&&state!=='NODE_MATCH_THIS_SESSION')awaitingProofCount++;
-    if(projection.creditedLuna>0){
-      if(!Number.isSafeInteger(observedNodeLuna+projection.creditedLuna))throw Error('Node-observed total overflow');
-      observedNodeLuna+=projection.creditedLuna;observedNodeCount++;
+    if(effectiveCredited>0){
+      if(!Number.isSafeInteger(observedNodeLuna+effectiveCredited))throw Error('Node-observed total overflow');
+      observedNodeLuna+=effectiveCredited;observedNodeCount++;
     }
     lines.push({chargeId:charge.id,propertyId:unit.propertyId,
       propertyName:properties.get(unit.propertyId)!.name,unitId:unit.id,unitLabel:unit.label,
       period:charge.period,amountLuna:charge.amountLuna,outstandingLuna:outstanding,recipient:charge.recipient,
-      dueDate,daysLate:Math.max(0,difference),ageBucket:bucket,state,hasSubmittedHash,sessionCreditedLuna:projection.creditedLuna,observedNodeStatus:projection.status});
+      dueDate,daysLate:Math.max(0,difference),ageBucket:bucket,state,hasSubmittedHash,sessionCreditedLuna:effectiveCredited,observedNodeStatus:projection.status});
   }
   lines.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.propertyName.localeCompare(b.propertyName)||a.unitLabel.localeCompare(b.unitLabel));
   return {asOf,lines,outstandingLuna,overdueLuna,overdueCount,awaitingProofCount,observedNodeLuna,observedNodeCount,ageBuckets:buckets};
