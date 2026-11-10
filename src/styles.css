@@ -131,3 +131,16 @@
  .collection-metrics b,.portable-metrics b{font-size:19px}
  .collection-row{align-items:flex-start;flex-direction:column;gap:8px}
 }
+
+
+/* User-acknowledged historical single-RPC evidence casebook. */
+.casebook-panel{margin:20px 0;padding:20px;border-radius:18px}
+.casebook-panel>p{font-size:13px;line-height:1.6;color:#62758d;margin:8px 0 18px}
+.casebook-entry{padding:14px 0;border-top:1px solid #e4ebf3}
+.casebook-entry>strong{font-size:13px;color:#233954}
+.casebook-entry>p{margin:7px 0 10px;color:#64748b;font-size:12px;line-height:1.55}
+.casebook-line{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 12px;border-radius:9px;background:#f3f7fd;margin:6px 0;font-size:12px}
+.casebook-line .mono{font-weight:700;color:#234973;overflow-wrap:anywhere}
+.casebook-line small{flex-basis:100%;color:#70829a;font-size:11px}
+.casebook-panel>button{margin-top:14px}
+@media(max-width:640px){.casebook-panel{padding:15px}.casebook-line{align-items:flex-start}}
