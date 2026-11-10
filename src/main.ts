@@ -2,6 +2,8 @@ import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
+import { addProofClaim, removeProofClaim, claimsForCharge, reconcileClaimedCharge, loadProofClaims, saveProofClaims, type ProofClaim, type ProofCheckMap } from './proof-desk.ts';
+import { createRentStatement, decodeRentStatement, rentStatementUrl, type PublicRentStatement } from './rent-statement.ts';
 import { checkPilotRequest,PILOT_LUNA,type PilotConfig } from './pilot-guard.ts';
 import { inspectWalletAddresses, receivingAddressAssessment, type WalletPreflight } from './wallet-preflight.ts';
 import { createPaymentAudit, decodePaymentAudit, auditUrl, type PublicPaymentAudit } from './audit.ts';
@@ -14,7 +16,7 @@ import {
 import { loadPortfolio, savePortfolio } from './storage.ts';
 import { checkHost, explainHostError, submitUserApprovedPayment, type HostCheck } from './host.ts';
 
-type View = 'overview' | 'properties' | 'charges' | 'wallet';
+type View = 'overview' | 'properties' | 'charges' | 'wallet' | 'reconcile';
 const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) throw new Error('Missing application mount element.');
 
@@ -24,6 +26,15 @@ let selectedView: View = 'overview';
 let workspaceMonth = currentPeriod();
 let filterProperty = '';
 let nextPeriodPreview: {period:string; count:number; skipped:number; next:string}|null=null;
+let proofClaims:ProofClaim[]=loadProofClaims();
+let liveProofChecks:ProofCheckMap={};
+let deskChargeId='';
+let deskBusy=false;
+let deskMessage='';
+let publicStatement:PublicRentStatement|null=null;
+let publicStatementError='';
+let publicStatementBusy=false;
+let publicStatementChecks:ProofCheckMap={};
 let publicAudit: PublicPaymentAudit | null = null;
 let publicAuditError = '';
 let publicAuditBusy = false;
@@ -71,7 +82,10 @@ function pilotConfig():PilotConfig{
 }
 
 const search = new URLSearchParams(window.location.search);
-if (search.has('audit')) {
+if(search.has('statement')){
+  try{publicStatement=decodeRentStatement(search.get('statement')||'');}
+  catch(e){publicStatementError=e instanceof Error?e.message:'Invalid public statement link.';}
+}else if (search.has('audit')) {
   try {publicAudit = decodePaymentAudit(search.get('audit') || '');}
   catch(error){publicAuditError=error instanceof Error?error.message:'Invalid verification link.';}
 } else if (search.has('pay')) {
