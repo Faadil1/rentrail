@@ -19,7 +19,7 @@ A real human-authorized 0.005 NIM mainnet pilot, an independently reported exact
 | Recurring charges | Next-month planning and opaque references | Draft/review/send, cancel/reissue, per-unit schedules |
 | Collections operations | Aggregate month metrics | **Now added:** action queue, missing invoices, submitted-unverified priorities, past-period exceptions |
 | Nimiq Pay transfers | One real mainnet experimental send | General sends deliberately off; exact-value native modal, global idempotency, recipient authenticity unresolved |
-| Independent evidence | Single public RPC confirms exact transfer tuple and macroblock | Need persistent attributed proof observations, multi-hash payments, recheck, non-replay and disputes |
+| Independent evidence | Single public RPC confirms exact transfer tuple and macroblock | **Now added:** explicit-save local single-RPC observations per charge, partial multi-hash tally, same-hash replay detection; still need automatic expiry/recheck and disputes |
 | Multi-party work | Unsigned request links, no shared database | Need signed owner statements, tenant/landlord permissions, revocation and synchronized state |
 | Workspace continuity | Local storage only | **Now added:** validated local JSON export, preview, explicit restore; cloud sync NOT implied |
 | External adoption | One pilot tester | Need a new consenting tenant/landlord pair and honest session completion feedback |
@@ -35,7 +35,14 @@ Users can copy a JSON snapshot and restore on another browser. Before overwritin
 
 The backup contains property and unit labels and public receiving addresses. It is plaintext, sensitive, not uploaded, not encrypted, and does not create a shared cloud ledger.
 
-Tests: 251 passing after this slice, up from 217. Real-device acceptance for the slice remains a separate gate.
+### Historical on-chain evidence casebook
+- After an existing hash is independently checked as FINAL_MATCHED, the user can **explicitly save** the source-attributed RPC observation for that charge.
+- The ledger can display multiple partial transaction hashes and the amount those stored observations previously reported. One hash cannot be assigned to multiple charges and no hash is implicitly a legal rent receipt.
+- The casebook is local, its entries identify one RPC and block/macroblock heights, and the UI warns the observations are **not continuously revalidated**. Each viewer should independently recheck before relying on one.
+- The portable JSON workspace now also carries **validated historical observations**; restores never attach previous browser evidence to a new portfolio.
+- No automatic owner acceptance, shared synchronization or legal status change was added.
+
+Tests: **270 synthetic automated tests planned** (217 baseline plus 53 new) with CI required; actual final count should be read from the latest successful GitHub run. Real-device acceptance for this slice remains a separate gate.
 
 ## Highest-value next gates (in order)
 
