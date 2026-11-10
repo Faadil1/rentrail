@@ -12,6 +12,7 @@ export interface SmokeContext {
   walletNetwork: NimiqHostNetwork;
   consensus: boolean;
   walletBlockHeight: number | null;
+  hostCheckedAtMs: number | null;
   publicRpcNetwork: string | null;
   publicRpcBlockHeight: number | null;
   publicRpcObservedAt: string | null;
@@ -32,6 +33,10 @@ export function assessSmokePayment(ctx: SmokeContext): SmokeAssessment {
   if(ctx.consensus!==true) reasons.push('Nimiq Pay consensus must be established.');
   if(!Number.isSafeInteger(ctx.walletBlockHeight) || (ctx.walletBlockHeight??-1)<1) {
     reasons.push('Wallet mainnet height is unavailable.');
+  }
+  if(!Number.isFinite(ctx.hostCheckedAtMs)||ctx.hostCheckedAtMs===null||
+     ctx.hostCheckedAtMs>ctx.nowMs+10_000||ctx.nowMs-ctx.hostCheckedAtMs>MAX_RPC_AGE_MS) {
+    reasons.push('Host wallet check is stale; recheck Nimiq Pay.');
   }
   if(ctx.publicRpcNetwork!=='MainAlbatross') reasons.push('Independent RPC must report MainAlbatross.');
   if(!Number.isSafeInteger(ctx.publicRpcBlockHeight) || (ctx.publicRpcBlockHeight??-1)<1) {
