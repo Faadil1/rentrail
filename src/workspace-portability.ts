@@ -1,10 +1,12 @@
 import {assertPeriod, isSafeLuna, looksLikeNimiqAddress, makeMemo, type Portfolio} from './domain.ts';
+import {validateCasebook,type PaymentCasebook} from './evidence-casebook.ts';
 
 export interface PortableWorkspace {
   format:'rentrail-workspace';
   version:1;
   exportedAt:string;
   portfolio:Portfolio;
+  casebook?:PaymentCasebook;
 }
 const MAX_IMPORT_BYTES=200_000;
 const validId=(id:unknown):id is string=>typeof id==='string'&&/^[a-z0-9_-]{1,64}$/i.test(id);
@@ -45,10 +47,11 @@ export function validateWorkspacePortfolio(raw:unknown):Portfolio{
    submissions:submissions.map(s=>({chargeId:String(s.chargeId),hash:s.hash===null?null:String(s.hash).toLowerCase(),state:s.state as 'SUBMITTED_UNVERIFIED'|'OUTCOME_UNKNOWN',createdAt:String(s.createdAt)})),
  };
 }
-export function createWorkspaceBackup(portfolio:Portfolio,now=new Date().toISOString()):string{
+export function createWorkspaceBackup(portfolio:Portfolio,now=new Date().toISOString(),casebook?:PaymentCasebook):string{
  const validated=validateWorkspacePortfolio(portfolio);
  if(!validDate(now))throw Error('Invalid export timestamp');
- const result=JSON.stringify({format:'rentrail-workspace',version:1,exportedAt:now,portfolio:validated} satisfies PortableWorkspace);
+ const safeBook=casebook?validateCasebook(casebook,validated):undefined;
+ const result=JSON.stringify({format:'rentrail-workspace',version:1,exportedAt:now,portfolio:validated,casebook:safeBook} satisfies PortableWorkspace);
  if(result.length>MAX_IMPORT_BYTES)throw Error('Workspace too large to back up');
  return result;
 }
@@ -59,7 +62,10 @@ export function readWorkspaceBackup(source:string):PortableWorkspace{
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return fail('invalid document');
  const d=raw as Record<string,unknown>;
  if(d.format!=='rentrail-workspace'||d.version!==1||!validDate(d.exportedAt))return fail('unsupported backup format or version');
- return {format:'rentrail-workspace',version:1,exportedAt:String(d.exportedAt),portfolio:validateWorkspacePortfolio(d.portfolio)};
+ const portfolio=validateWorkspacePortfolio(d.portfolio);
+ // Optional historic RPC observations remain informational, never accepted as legal rent.
+ const casebook=d.casebook===undefined?undefined:validateCasebook(d.casebook,portfolio);
+ return {format:'rentrail-workspace',version:1,exportedAt:String(d.exportedAt),portfolio,casebook};
 }
 export function backupSummary(p:Portfolio):{properties:number;units:number;charges:number;unverified:number}{
  return {properties:p.properties.length,units:p.units.length,charges:p.charges.length,unverified:p.submissions.length};
