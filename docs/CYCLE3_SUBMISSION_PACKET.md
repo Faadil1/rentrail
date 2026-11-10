@@ -39,7 +39,7 @@ A **97-second private, silent, caption-led reviewer cut** was created in the con
 - **GitHub repo:** https://github.com/Faadil1/rentrail
 - **Category:** PAY
 - **MIT license:** repository `LICENSE` exists.
-- **Status:** NOT SUBMITTED; no registration portal confirmation or accepted submission PR observed.
+- **Status:** NOT SUBMITTED; no registration portal confirmation or official accepted submission PR observed. **Code integration done**; exact release iPhone run and human portal action remain.
 
 ## Evidence for judges (truth boundary)
 
@@ -53,7 +53,7 @@ A **97-second private, silent, caption-led reviewer cut** was created in the con
 
 ## Required go/no-go before submission
 
-1. Verify README, license and `main` contain the complete app source (not just a draft PR).
+1. **DONE:** README, MIT license and full app code are on public `main` after [PR #14](https://github.com/Faadil1/rentrail/pull/14), merge SHA `804da16130d55bf91a1895592c53896af2d2d31f`; [CI green with 217 tests](https://github.com/Faadil1/rentrail/actions/runs/42857364765).
 2. Open exact public preview SHA inside Nimiq Pay and verify Wallet gate/MAINNET/public RPC and local ledger flow; **do not initiate a new payment**.
 3. Ensure judges can easily test working core features without permission to move money.
 4. Review/edit/upload the private demo video with explicit privacy consent; link the public clip in the portal if approved.

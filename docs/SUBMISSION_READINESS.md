@@ -20,12 +20,12 @@ See [G2_PILOT_500_LUNA.md](./G2_PILOT_500_LUNA.md) and [MAINNET_DEMO_AND_SUBMISS
 - [x] Mobile shell + locally stored properties, units, monthly obligations, next-month draft planning, public evidence recheck.
 - [x] G1: SDK provider observed inside user's iPhone Nimiq Pay (earlier G1 Preview), not necessarily same app version.
 - [x] G3: real public RPC network/schema and CORS observed from GitHub Actions, **not** necessarily mobile WebView.
-- [ ] Review and merge stacked docs and app PRs in order; do not present `main` as feature-ready while unmerged.
+- [x] **Canonical public code on `main`**: consolidated release PR #14 merged as `804da16130d55bf91a1895592c53896af2d2d31f`; earlier stacked draft PRs #1/#7–#13 closed as superseded. Main GitHub Actions `42857364765` SUCCESS (217 tests).
 - [x] Validate the G2 pilot Staging inside Nimiq Pay: host MAINNET and independent public RPC accessible from iPhone WebView; repeat for a final released public build.
 - [x] Human-approved tiny mainnet NIM transfer + matching finality **reported by one public RPC** and receiver B receipt **user-confirmed**. **Second independent device/node recheck outstanding.**
 - [ ] Separate security go/no-go for opening genuine rental transfers beyond limited smoke test. Explicitly avoid fake settlement states and unsigned recipient impersonation.
 - [ ] One or more consenting outside-user walkthroughs and real feedback; no invented unique user counts.
-- [ ] Final distinct app name and collision check, replace working-brand copy, branded assets.
+- [x] Product name **RentRail** and working-name placeholder replaced in app. A basic public-web collision check was performed; **this is not a trademark clearance**. Additional polish and full asset package remain desirable.
 - [ ] Rehearse a real UI demonstration with factual video, user-visible chain state, test receipt (never fabricate payment), exact deploy SHA.
 - [ ] Confirm team lead, optional members and payout Nimiq address directly with humans; do not infer team roles or payout shares.
 - [ ] Submit to official registration dashboard (PAY), public MIT repo, working live URL, <=250 word description, demo video (recommended), and capture actual submission confirmation.
