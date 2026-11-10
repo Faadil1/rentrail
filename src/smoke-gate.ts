@@ -24,6 +24,7 @@ export interface SmokeContext {
   priorAttemptUnresolved: boolean;
   recipient: string;
   allowlistedRecipient: string | null;
+  sharedPayerAddresses: string[] | null;
   memo: string;
 }
 export interface SmokeAssessment { allowed: boolean; reasons: string[]; }
@@ -60,6 +61,12 @@ export function assessSmokePayment(ctx: SmokeContext): SmokeAssessment {
   if(typeof ctx.allowlistedRecipient!=='string' ||
      ctx.recipient.replace(/\s+/g,'').toUpperCase()!==ctx.allowlistedRecipient.replace(/\s+/g,'').toUpperCase()){
     reasons.push('Recipient is not the explicitly approved test wallet address.');
+  }
+  if(!Array.isArray(ctx.sharedPayerAddresses)||ctx.sharedPayerAddresses.length<1||
+     ctx.sharedPayerAddresses.some(a=>typeof a!=='string'||!/^NQ[0-9]{2}[0-9A-HJ-NP-VX-Y]{32}$/.test(a.replace(/\s+/g,'').toUpperCase()))){
+    reasons.push('Payer wallet addresses must be explicitly shared and checked first.');
+  }else if(ctx.sharedPayerAddresses.some(a=>a.replace(/\s+/g,'').toUpperCase()===ctx.recipient.replace(/\s+/g,'').toUpperCase())){
+    reasons.push('The recipient is an address shared by this wallet: Nimiq prohibits self-transfers. Use a different recipient.');
   }
   if(!/^RR1:[0-9a-f]{32}$/.test(ctx.memo)) reasons.push('Only opaque rent references are allowed.');
   if(!ctx.recipientCheckAcknowledged) reasons.push('Confirm recipient with the payee outside this unsigned link.');
