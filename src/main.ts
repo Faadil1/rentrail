@@ -651,15 +651,16 @@ async function onVerifyG3(form:HTMLFormElement):Promise<void>{
     const result=await verifyNimTransaction({hash:txHashInput,recipient:charge.recipient,memo:charge.memo,amountLuna:charge.amountLuna,allowPartial:true});
     txVerifyResult=result;
     txVerifiedChargeId=charge.id;
-    if(result.state==='FINAL_MATCHED'&&Number.isSafeInteger(result.amountLuna)&&result.amountLuna!>0){
+    if(result.state==='FINAL_MATCHED'&&typeof result.amountLuna==='number'&&Number.isSafeInteger(result.amountLuna)&&result.amountLuna>0){
       const hash=result.hash.toLowerCase();
       const existsAcrossCharge=Object.entries(observedProofs).some(([id,proofs])=>id!==charge.id&&proofs.some(p=>p.hash===hash));
       if(!existsAcrossCharge){
         const prior=observedProofs[charge.id]??[];
         if(!prior.some(p=>p.hash===hash)){
+          const matchedLuna=result.amountLuna;
           observedProofs={...observedProofs,[charge.id]:[...prior,{
             network:'nimiq-mainnet',hash,recipient:charge.recipient,memo:charge.memo,
-            amountLuna:result.amountLuna,status:'FINAL_VERIFIED'
+            amountLuna:matchedLuna,status:'FINAL_VERIFIED'
           }]};
         }
       }
