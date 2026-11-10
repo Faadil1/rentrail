@@ -1,4 +1,4 @@
-import { type Portfolio, type Charge } from './domain.ts';
+import { type Portfolio } from './domain.ts';
 import {monthSnapshot} from './operations.ts';
 
 export type CollectionPriority='MISSING_INVOICE'|'PAST_PERIOD_UNMATCHED'|'SUBMITTED_NOT_VERIFIED'|'CURRENT_PERIOD_UNMATCHED';
@@ -31,7 +31,6 @@ export function buildCollectionQueue(p:Portfolio,period:string,propertyId=''):Co
  const actions:CollectionAction[]=[];
  const selectedUnits=p.units.filter(u=>!propertyId||u.propertyId===propertyId);
  const billed=new Set(snap.lines.map(x=>x.charge.unitId));
- const chargeById=new Map<string,Charge>(p.charges.map(c=>[c.id,c]));
  for(const u of selectedUnits){
   if(billed.has(u.id))continue;
   const building=p.properties.find(b=>b.id===u.propertyId);
