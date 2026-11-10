@@ -4,6 +4,18 @@ Date: 2026-11-10 UTC. **Status: ONE USER-APPROVED MAINNET TRANSFER OBSERVED; pub
 Branch: `feat/authorized-500-luna-pilot` (stacked on `feat/recipient-b-preflight`).
 Build source SHA: `f736e50d10b1875b5b98ba9c74479ea914c391e8`.
 
+## B receiver user acknowledgement — 2026-11-10, 11:05 EST
+
+The wallet holder directly confirmed in the ongoing private conversation: **"le protefeuille B a les 0,005 Nim"** — their receiving wallet B visibly holds the transferred **0.005 NIM**.
+
+**Evidence classification:** HUMAN_REPORTED_B_RECEIPT. This is a direct user attestation of the separate receiving wallet balance, not a screenshot independently inspected by the reviewer, nor a second RPC node or cryptographic ownership proof. It is nevertheless consistent with the already independently-of-wallet, **single-public-RPC** `FINAL_MATCHED` result, exact value **500 Luna**, recipient B and memo `RR1:62b40b30…`, canonical microblock and later macroblock.
+
+**G2/G3 pilot outcome:** transfer submitted by human approval → confirmed final/matching by one public node → B recipient balance user-confirmed. **PASS_WITH_CAVEATS** for first real Nimiq Pay mainnet trial. Do not upgrade to production payment acceptance, legal rent settlement, global duplicate prevention, or third-party multi-node consensus.
+
+**No second payment is authorized.** The dedicated pilot deployment stays protected by Vercel Authentication, and future builds have the send flag disabled. Existing immutable client code remains a potential risk for an authenticated user with access; avoid reuse of the original pilot URL.
+
+Outstanding disclosure: native approval sheet showed **0.01 NIM** whereas on-chain actual amount was **0.005 NIM**. The public Nimiq Mini App API confirms native `sendBasicTransactionWithData` value is denominated in **Luna**, and `1 NIM = 100,000 Luna`, but does **not** document why the native UI displayed two decimal places. Root cause **NOT VERIFIED**; report as an apparent rounding/formatting issue, not a proven fix.
+
 ## Observed first paid test — PASS with critical native amount-display discrepancy
 
 Private user-provided 33.4-second iPhone screen recording, local start time approximately **2026-11-10 01:01 EST**, shows the exact Nimiq Pay-hosted pilot:
