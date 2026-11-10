@@ -2,6 +2,7 @@ import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
+import { checkPilotRequest,PILOT_LUNA,type PilotConfig } from './pilot-guard.ts';
 import { inspectWalletAddresses, receivingAddressAssessment, type WalletPreflight } from './wallet-preflight.ts';
 import { createPaymentAudit, decodePaymentAudit, auditUrl, type PublicPaymentAudit } from './audit.ts';
 import { checkPublicMainnetRpc, verifyNimTransaction, type VerifyResult, type RpcNetworkCheck } from './rpc.ts';
@@ -59,6 +60,15 @@ let outcomeUnknown = false;
 // Prevent an accidental duplicate request after reloading a tenant's browser.
 // Browser storage is best effort, not a network-wide duplicate-payment lock.
 function localPaymentKey(id:string):string{return `rentrail-pending-${id}`;}
+function pilotAttemptKey(id:string):string{return `rentrail-500-luna-attempt-${id}`;}
+function pilotConfig():PilotConfig{
+  return {
+    recipient:import.meta.env.VITE_SMOKE_ALLOW_RECIPIENT,
+    chargeId:import.meta.env.VITE_SMOKE_ALLOW_CHARGE_ID,
+    amountLuna:import.meta.env.VITE_SMOKE_ALLOW_AMOUNT_LUNA,
+    period:import.meta.env.VITE_SMOKE_ALLOW_PERIOD
+  };
+}
 
 const search = new URLSearchParams(window.location.search);
 if (search.has('audit')) {
@@ -68,6 +78,7 @@ if (search.has('audit')) {
   try {
     tenantRequest = decodeRequest(search.get('pay') || '');
     const prior = localStorage.getItem(localPaymentKey(tenantRequest.chargeId));
+    if(localStorage.getItem(pilotAttemptKey(tenantRequest.chargeId))) outcomeUnknown=true;
     if (prior) {
       const item = JSON.parse(prior) as {status?:string,hash?:string};
       if (item.status==='SUBMITTED_UNVERIFIED') submittedHash = typeof item.hash==='string'?item.hash:null;
@@ -299,7 +310,7 @@ function decodeRequest(encoded:string):SharedRequest {
   return validateSharedRequest(JSON.parse(text));
 }
 function smokeAssessment(request:SharedRequest):SmokeAssessment{
-  return assessSmokePayment({
+  const safety=assessSmokePayment({
     buildAllowsSmoke:paymentEnabled,
     walletNetwork:check?.network??'unknown',
     consensus:hostStatus==='connected' && check?.consensus===true,
@@ -318,6 +329,8 @@ function smokeAssessment(request:SharedRequest):SmokeAssessment{
     sharedPayerAddresses:walletSnapshot?.accounts.map(x=>x.address)??null,
     memo:request.memo
   });
+  const strictPilot=checkPilotRequest(request,pilotConfig());
+  return {allowed:safety.allowed&&strictPilot.allowed,reasons:[...safety.reasons,...strictPilot.reasons]};
 }
 function tenantView(request:SharedRequest):string {
   const gate=smokeAssessment(request);
@@ -334,7 +347,7 @@ function tenantView(request:SharedRequest):string {
     <div class="smoke-panel" aria-label="Controlled mainnet test safety">
       <div class="eyebrow">G2 · REAL MONEY SAFETY CHECK</div>
       <h3>One small, controlled transaction</h3>
-      <p>This flow is for a separately approved test payment only, not actual rent. Maximum <strong>${formatNim(SMOKE_MAX_LUNA)} NIM</strong> on mainnet plus any wallet fee. Payment is permanently disabled in normal previews.</p>
+      <p>This is an approved fictional trial, not residential rent. Only <strong>${formatNim(PILOT_LUNA)} NIM</strong> (500 Luna) to the explicitly authorized wallet B, plus a fee chosen by Nimiq Pay, can be requested. If anything differs in the native dialog, cancel. This browser-local attempt lock is NOT a cross-device spending limit.</p>
       <div class="host-report"><div><span>Wallet network</span><b>${escapeHtml(walletNetwork.toUpperCase())}</b></div><div><span>Independent public RPC</span><b>${escapeHtml(rpcNetworkLabel)}</b></div><div><span>SDK height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>RPC height</span><b>${rpcNetwork?.headHeight??'Unknown'}</b></div></div>
       <button class="tertiary full" id="tenant-check-host" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='connected'?'Recheck Nimiq Pay':'Check Nimiq Pay host'}</button>
       <button class="tertiary full" id="tenant-check-rpc" type="button" ${rpcChecking?'disabled':''}>${rpcChecking?'Checking RPC…':'Check independent mainnet RPC'}</button>
@@ -591,6 +604,15 @@ async function onTenantPay():Promise<void>{
   if(!gate.allowed||!check||hostStatus!=='connected'){
     error(gate.reasons[0]||'The native host is not ready. No payment requested.');return;
   }
+  // Mark the attempt before asking Nimiq Pay to open its native dialog.
+  // Storage failure means no send. A reload on this origin cannot silently retry.
+  // This is NOT cross-device idempotency; each native send still needs human approval.
+  try {
+    const key=pilotAttemptKey(tenantRequest.chargeId);
+    if(localStorage.getItem(key))throw Error('A previous pilot wallet request is already recorded. Do not retry.');
+    localStorage.setItem(key,JSON.stringify({status:'ATTEMPT_STARTED',at:new Date().toISOString()}));
+    localStorage.setItem(localPaymentKey(tenantRequest.chargeId),JSON.stringify({status:'OUTCOME_UNKNOWN'}));
+  }catch(err){error(err instanceof Error?err.message:'Browser storage unavailable. No payment requested.');return;}
   paymentBusy=true;render();
   try{
     const hash=await submitUserApprovedPayment(check,tenantRequest,gate);
@@ -606,8 +628,10 @@ async function onTenantPay():Promise<void>{
   }catch(err){
     const description=explainHostError(err);
     const type=(err && typeof err==='object' && 'type' in err)?String(err.type):'';
-    if(type==='PERMISSION_DENIED'){hostMessage='Wallet approval was canceled; no success is claimed.';}
-    else {outcomeUnknown=true;hostMessage=`${description} No automatic retry.`; try{localStorage.setItem(localPaymentKey(tenantRequest.chargeId),JSON.stringify({status:'OUTCOME_UNKNOWN'}));}catch{/* Best effort only. */}}
+    outcomeUnknown=true;
+    if(type==='PERMISSION_DENIED')hostMessage='Native wallet approval was rejected; no success is claimed. This one-attempt test is locked. Inspect wallet history before considering any new test.';
+    else hostMessage=`${description} Outcome needs review; do not retry.`;
+    try{localStorage.setItem(localPaymentKey(tenantRequest.chargeId),JSON.stringify({status:'OUTCOME_UNKNOWN'}));}catch{/* Pilot attempt marker already set before native request. */}
   }finally{paymentBusy=false;render();}
 }
 
