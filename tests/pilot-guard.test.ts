@@ -8,9 +8,10 @@ const VALID_OTHER='NQ48 8CKH BA24 2VR3 N249 N8MN J5XX 74DB 5XJ8'; // published e
 const ID='62b40b301f8829c113e7e5a622840450';
 const request:SharedRequest={v:1,chargeId:ID,recipient:VALID_A,amountLuna:500,memo:`RR1:${ID}`,period:'2026-11'};
 const config:PilotConfig={recipient:VALID_A,chargeId:ID,amountLuna:'500',period:'2026-11'};
-const deny=(r:SharedRequest=request,c:PilotConfig=config)=>assert.equal(checkPilotRequest(r,c).allowed,false);
+const duringPilot=Date.UTC(2026,10,10,6,0,0);
+const deny=(r:SharedRequest=request,c:PilotConfig=config)=>assert.equal(checkPilotRequest(r,c,duringPilot).allowed,false);
 test('exact recipient, amount, reference and month can pass pure pilot preflight (no funds sent)',()=>{
- const p=checkPilotRequest(request,config);assert.equal(p.allowed,true);assert.deepEqual(p.reasons,[]);
+ const p=checkPilotRequest(request,config,duringPilot);assert.equal(p.allowed,true);assert.deepEqual(p.reasons,[]);
  assert.equal(PILOT_LUNA,500);assert.equal(PILOT_PERIOD,'2026-11');
 });
 test('empty recipient build config fails closed',()=>deny(request,{...config,recipient:undefined}));
@@ -34,5 +35,11 @@ test('reference cannot be malformed in config',()=>deny(request,{...config,charg
 test('reference must match exact build allowlist',()=>deny(request,{...config,chargeId:'f'.repeat(32)}));
 test('normalized NQ case and whitespace are accepted if checksum valid',()=>{
  const c={...config,recipient:VALID_A.replaceAll(' ','').toLowerCase()};
- assert.equal(checkPilotRequest({...request,recipient:VALID_A.toLowerCase()},c).allowed,true);
+ assert.equal(checkPilotRequest({...request,recipient:VALID_A.toLowerCase()},c,duringPilot).allowed,true);
+});
+test('pilot expiration disables send after 2026-11-11T23:45Z',()=>{
+ assert.equal(checkPilotRequest(request,config,Date.UTC(2026,10,11,23,45,0)).allowed,false);
+});
+test('pilot remains bounded even one millisecond before expiry',()=>{
+ assert.equal(checkPilotRequest(request,config,Date.UTC(2026,10,11,23,44,59,999)).allowed,true);
 });
