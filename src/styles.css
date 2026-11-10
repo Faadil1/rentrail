@@ -80,3 +80,20 @@
 .smoke-panel .consent{font-size:12px;line-height:1.45}
 .smoke-panel .checkout-status{overflow-wrap:anywhere}
 @media(max-width:400px){.smoke-panel{padding:13px}.smoke-panel .host-report{grid-template-columns:1fr 1fr}.smoke-panel .host-report>div{padding:9px 8px}}
+
+
+/* Explicit, privacy-conscious account inspection (read-only). */
+.wallet-inventory{margin:20px 0 22px;padding:clamp(16px,2.7vw,24px);border:1px solid #dce6f1;border-radius:18px;background:#fff}
+.wallet-inventory h3{margin:8px 0 10px;font-size:clamp(19px,2.3vw,25px)}
+.wallet-inventory>p{margin:0 0 15px;color:#687992;font-size:13px;line-height:1.55;max-width:66ch}
+.wallet-inventory>button{margin-bottom:10px}
+.account-list{margin:12px 0 0;border-top:1px solid #e6ecf4;padding-top:11px}
+.account-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid #edf1f7}
+.account-row>div{display:grid;gap:5px;min-width:0}
+.account-row strong{font-size:13px;color:#213550;letter-spacing:.02em;overflow-wrap:anywhere}
+.account-row small{font-size:11px;color:#697e97}
+.account-row button{font-size:12px;white-space:nowrap}
+.account-warning{font-size:12px;color:#815a21;margin:10px 0}
+.account-note{font-size:12px;line-height:1.6;color:#60748e;margin:13px 0 0}
+.smoke-panel .account-note{background:#f0f6ff;border-radius:10px;padding:11px;margin:0}
+@media(max-width:480px){.wallet-inventory{padding:15px 12px}.account-row{align-items:flex-start;flex-direction:column;gap:10px}.account-row button{width:100%;justify-content:center}}
