@@ -104,3 +104,30 @@
 .release-notice p{margin:8px 0 12px;color:#344d6c;font-size:13px;line-height:1.63;max-width:75ch}
 .release-notice button{margin:3px 0 0}
 @media(max-width:650px){.release-notice{padding:14px;margin-top:12px}.release-notice p{font-size:12.5px}}
+
+
+/* Product-depth v1: month-based collections queue and portable local workspace. */
+.collections-panel,.portable-panel{margin:22px 0;padding:22px;border-radius:18px}
+.collections-panel>p,.portable-panel>p{color:#64748b;font-size:13px;line-height:1.65;margin:9px 0 14px}
+.collection-metrics,.portable-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+.collection-metrics span,.portable-metrics span{border-radius:12px;background:#f3f6fc;padding:12px 9px;font-size:12px;color:#617188;line-height:1.45}
+.collection-metrics b,.portable-metrics b{display:block;font-size:21px;color:#21324b;font-variant-numeric:tabular-nums;margin-bottom:2px}
+.collection-list{border-top:1px solid #e5eaf2}
+.collection-row{display:flex;gap:18px;justify-content:space-between;align-items:center;border-bottom:1px solid #e5eaf2;padding:13px 1px}
+.collection-copy{display:grid;gap:5px;min-width:0}
+.collection-copy strong{font-size:13px;color:#263b56}
+.collection-copy small{font-size:11px;color:#62758b;line-height:1.4}
+.collection-amount{flex-shrink:0;color:#365372;font-size:13px;font-weight:750}
+.collection-actions{margin-top:15px}
+.portable-panel .form-stack{margin-top:17px}
+.portable-panel textarea{font:12px/1.5 ui-monospace,monospace;resize:vertical;overflow-wrap:anywhere}
+.import-preview{margin-top:16px;padding:15px;border:1px solid #cbdcee;background:#f4f8ff;border-radius:13px}
+.import-preview p{font-size:12px;line-height:1.6;color:#455e7d}
+.import-preview .consent{display:flex;gap:8px;align-items:flex-start;font-size:12px;margin:12px 0}
+.import-preview button{margin-top:8px}
+@media(max-width:640px){
+ .collections-panel,.portable-panel{padding:15px}
+ .collection-metrics,.portable-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ .collection-metrics b,.portable-metrics b{font-size:19px}
+ .collection-row{align-items:flex-start;flex-direction:column;gap:8px}
+}
