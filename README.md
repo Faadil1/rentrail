@@ -19,6 +19,16 @@ Inside **Nimiq Pay → Mini Apps → Custom URL**, paste the HTTPS URL. The brow
 5. To verify an **already completed** NIM transaction, paste a real hash and match the relevant recipient, amount and memo. The verification is deliberately conservative; a hash alone is not a receipt.
 6. If the history node reports an exact executed transfer included in a canonical microblock and a following macroblock, RentRail labels the evidence `FINAL_MATCHED`. **This is one node's report**, not a light-client proof, real landlord identity verification or legal acknowledgement of rent paid.
 
+## Collections & Operations (new depth V1)
+
+Beyond generating requests, RentRail has a browser-local **Collections** workspace. It can set a monthly due day for each unit (1–28), age open requests into upcoming, due today, 1–7, 8–30 and 31+ days, filter by property, create **human-reviewable** follow-up drafts and export a privacy-minimal, spreadsheet-safe CSV.
+
+When the public mainnet G3 verifier reports a `FINAL_MATCHED` hash for a real local invoice, the collections queue updates its observed remaining amount in the **current browser session**, including partial transfers. Any duplicate, wrong network or mismatching memo remains under review; it is never silently credited. The observed amount is not stored as legal settlement and disappears upon reload.
+
+A past due date is not a legally established arrears claim. No messages are sent, no late fees levied, and no further NIM transfers are initiated. This is a local operational tool, **not** authenticated accounting software.
+
+[Scope, truth boundaries and roadmap](docs/PRODUCT_DEPTH_COLLECTIONS_V1.md).
+
 ## What we actually tested
 
 On **10 November 2026**, a wallet holder successfully approved one **0.005 NIM (500 Luna)** transfer with the Nimiq Pay native confirmation sheet to a separate wallet. A public Nimiq mainnet history node independently reported the exact amount, destination, `RR1` memo, successful execution, canonical microblock inclusion and later macroblock. The recipient's wallet holder separately confirmed that 0.005 NIM appeared in the destination wallet.
