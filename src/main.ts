@@ -289,7 +289,9 @@ function smokeAssessment(request:SharedRequest):SmokeAssessment{
     realMoneyAcknowledged,
     walletApprovalAcknowledged:paymentAcknowledged,
     priorAttemptUnresolved:!!submittedHash||outcomeUnknown||paymentBusy,
-    recipient:request.recipient,memo:request.memo
+    recipient:request.recipient,
+    allowlistedRecipient:import.meta.env.VITE_SMOKE_ALLOW_RECIPIENT??null,
+    memo:request.memo
   });
 }
 function tenantView(request:SharedRequest):string {
