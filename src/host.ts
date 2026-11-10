@@ -1,3 +1,4 @@
+import { isValidNimiqAddress } from './address-validation.ts';
 import { init, getHostNetwork, NimiqProviderError } from '@nimiq/mini-app-sdk';
 import { SMOKE_MAX_LUNA, type NimiqHostNetwork, type SmokeAssessment } from './smoke-gate.ts';
 import { isSafeLuna, validateSharedRequest, looksLikeNimiqAddress, normalizeAddress, type SharedRequest } from './domain.ts';
@@ -43,7 +44,8 @@ export async function submitUserApprovedPayment(
     throw Error('This build is read-only; sending NIM is disabled.');
   if(!assessment.allowed) throw Error('Independent safety and consent gate did not pass.');
   const allowedRecipient=import.meta.env.VITE_SMOKE_ALLOW_RECIPIENT;
-  if(typeof allowedRecipient!=='string'||!allowedRecipient.trim()||
+  if(typeof allowedRecipient!=='string'||!isValidNimiqAddress(allowedRecipient)||
+     !isValidNimiqAddress(request.recipient)||
      allowedRecipient.replace(/\s+/g,'').toUpperCase()!==request.recipient.replace(/\s+/g,'').toUpperCase())
     throw Error('Payment recipient is not included in the approved smoke-test build allowlist.');
   const payload=validateSharedRequest(request);
