@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {collectionQueue,collectionCsv,dueDateFor,reminderDraft,utcCalendarDate,validDueDay} from '../src/collections.ts';
-import {emptyPortfolio,addProperty,addUnit,addCharge,recordSubmission,type Portfolio} from '../src/domain.ts';
+import {emptyPortfolio,addProperty,addUnit,addCharge,recordSubmission,type Portfolio,type TransferEvidence} from '../src/domain.ts';
 const a='a'.repeat(32),b='b'.repeat(32),c='c'.repeat(32),d='d'.repeat(32),prop='1'.repeat(32);
 const receiver='NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 function fixture():Portfolio{
@@ -73,4 +73,37 @@ test('CSV neutralizes spreadsheet formulas in names',()=>{
 test('empty portfolio has zero metrics, no fabricated payments',()=>{
  const q=collectionQueue(emptyPortfolio(),'2026-11-10');assert.deepEqual(q.lines,[]);
  assert.equal(q.outstandingLuna,0);assert.equal(q.overdueCount,0);
+});
+
+function proof(amountLuna:number,hash='f'.repeat(64)):TransferEvidence{
+ return {network:'nimiq-mainnet',hash,recipient:receiver,memo:'RR1:'+c,amountLuna,status:'FINAL_VERIFIED'};
+}
+test('one node-reported exact match reduces session-only outstanding, never local persistent charge',()=>{
+ const p=fixture();
+ const q=collectionQueue(p,'2026-11-10',{},'',{[c]:[proof(250_000)]});
+ assert.equal(q.observedNodeCount,1);assert.equal(q.observedNodeLuna,250_000);
+ assert.equal(q.outstandingLuna,200_000);assert.equal(q.lines[0].state,'NODE_MATCH_THIS_SESSION');
+ assert.equal(collectionQueue(p,'2026-11-10').outstandingLuna,450_000);
+});
+test('one node-reported partial match leaves due remainder and requests human follow-up',()=>{
+ const q=collectionQueue(fixture(),'2026-11-10',{},'',{[c]:[proof(100_000)]});
+ assert.equal(q.lines[0].outstandingLuna,150_000);
+ assert.equal(q.lines[0].observedNodeStatus,'PARTIALLY_FUNDED');
+ assert.equal(q.outstandingLuna,350_000);
+});
+test('wrong memo never silently credits rent even if hash is final',()=>{
+ const fake={...proof(250_000),memo:'RR1:'+'e'.repeat(32)};
+ const q=collectionQueue(fixture(),'2026-11-10',{},'',{[c]:[fake]});
+ assert.equal(q.lines[0].state,'NODE_REVIEW_REQUIRED');
+ assert.equal(q.observedNodeLuna,0);assert.equal(q.outstandingLuna,450_000);
+});
+test('testnet or unfinalized proof never credits local rent',()=>{
+ for(const evidence of [{...proof(250_000),network:'nimiq-testnet' as const},{...proof(250_000),status:'SUBMITTED_UNVERIFIED' as const}]){
+  const q=collectionQueue(fixture(),'2026-11-10',{},'',{[c]:[evidence]});
+  assert.equal(q.observedNodeLuna,0);assert.equal(q.outstandingLuna,450_000);
+ }
+});
+test('duplicate hash within a charge cannot be double credited',()=>{
+ const q=collectionQueue(fixture(),'2026-11-10',{},'',{[c]:[proof(125_000),proof(125_000)]});
+ assert.equal(q.observedNodeLuna,0);assert.equal(q.lines[0].state,'NODE_REVIEW_REQUIRED');
 });
