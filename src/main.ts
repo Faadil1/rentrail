@@ -1,5 +1,6 @@
 import './styles.css';
 import {createWorkspaceBackup,readWorkspaceBackup,backupSummary,type PortableWorkspace} from './workspace-portability.ts';
+import {buildCollectionQueue} from './collections-queue.ts';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
@@ -235,6 +236,22 @@ function propertiesView(p:Portfolio):string {
   <section class="stack"><div class="section-heading"><h2>Buildings</h2><span class="count">${p.properties.length}</span></div>${cards||emptyState('No properties yet','Add your first building using the form.', 'properties','Get started')}</section></div>
   <p class="footnote">Private labels are held only in this device's local browser storage. Do not treat them as backed up or shared with other users.</p>`;
 }
+function collectionOperationsPanel(p:Portfolio):string{
+ const q=buildCollectionQueue(p,workspaceMonth,filterProperty);
+ const view=q.actions.slice(0,12).map(a=>{
+  const priority=a.priority==='SUBMITTED_NOT_VERIFIED'?'Verify on-chain':a.priority==='PAST_PERIOD_UNMATCHED'?'Review past month':a.priority==='MISSING_INVOICE'?'Issue monthly request':'Outstanding locally';
+  return `<div class="collection-row"><div class="collection-copy"><strong>${escapeHtml(priority)} · ${escapeHtml(a.unitLabel)}</strong><small>${escapeHtml(a.propertyName)} · ${escapeHtml(a.period)}</small><small>${escapeHtml(a.note)}</small></div><div class="collection-amount">${a.chargeId?formatNim(a.amountLuna)+' NIM':'No invoice'}</div></div>`;
+ }).join('');
+ return `<section class="panel collections-panel" aria-label="Actionable rental operations queue">
+   <div class="eyebrow">COLLECTIONS WORKFLOW · NO AUTOMATED DEBITS</div>
+   <h3>What needs attention this month?</h3>
+   <p>Action queue for the selected period (${escapeHtml(workspaceMonth)}). These are local records, not proof of money owed, lateness or legal delinquency. All amounts remain unmatched unless independently reconciled and acknowledged.</p>
+   <div class="collection-metrics"><span><b>${q.missingInvoices}</b> missing invoices</span><span><b>${q.submittedForReview}</b> needs chain review</span><span><b>${q.pastPeriodUnmatched}</b> past periods to review</span><span><b>${q.currentPeriodUnmatched}</b> current unmatched</span></div>
+   <div class="collection-list">${view||'<p>No local actions identified for this period.</p>'}</div>
+   ${q.totalActions>12?`<small>${q.totalActions-12} more actions not shown. Use month and property filters to narrow the queue.</small>`:''}
+   <div class="collection-actions"><button class="tertiary" type="button" data-nav="wallet">Verify transaction proofs ${icon('arrow')}</button></div>
+ </section>`;
+}
 function portableWorkspacePanel(p:Portfolio):string {
  const counts=backupSummary(p);
  const restore=importCandidate?backupSummary(importCandidate.portfolio):null;
@@ -261,6 +278,7 @@ function chargesView(p:Portfolio):string {
     <p class="form-hint">The memo will be an opaque ID, never a tenant name or address. Amounts here are NIM obligations, not automatic fiat conversions.</p>
     <button class="primary" type="submit" ${preview||!p.units.length?'disabled':''}>${icon('plus')} Create obligation</button>
   </form></section><section class="stack"><div class="section-heading"><h2>Rent requests</h2><span class="count">${p.charges.length}</span></div>${p.charges.length?p.charges.slice().reverse().map(c=>chargeRow(p,c)).join(''):emptyState('No obligations recorded','Create a property and a unit before issuing a request.','properties','Set up property')}</section></div>
+  ${collectionOperationsPanel(p)}
   ${renewalPlanner(p)}
   ${portableWorkspacePanel(p)}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Sending is not settlement.</strong><p>All requests start OPEN. Any wallet-submitted hash remains unverified until independent chain verification is implemented.</p></div></div>`;
