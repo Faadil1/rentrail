@@ -9,6 +9,7 @@ export interface HostCheck {
   blockHeight: number | null;
   balanceReadAvailable: boolean;
   network: NimiqHostNetwork;
+  checkedAtMs: number;
 }
 export async function checkHost(): Promise<HostCheck> {
   const provider = await init();
@@ -20,7 +21,7 @@ export async function checkHost(): Promise<HostCheck> {
   }
   const detected = getHostNetwork();
   const network: NimiqHostNetwork = detected==='mainnet'||detected==='testnet' ? detected : 'unknown';
-  return { provider, consensus, blockHeight, network, balanceReadAvailable: typeof provider.getBalance === 'function' };
+  return { provider, consensus, blockHeight, network, checkedAtMs:Date.now(), balanceReadAvailable: typeof provider.getBalance === 'function' };
 }
 export function explainHostError(error: unknown): string {
   if (NimiqProviderError.is(error)) {
