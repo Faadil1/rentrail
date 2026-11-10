@@ -61,3 +61,22 @@
 .g3-amount-note strong{display:block;color:#203958;font-size:13px}
 .g3-amount-note p{margin:5px 0;font-size:12px;color:#37485c}
 .g3-amount-note small{display:block;font-size:11px;color:#65798f}
+
+
+/* Dedicated human-controlled G2 smoke gate — hidden wallet action on normal builds. */
+.smoke-panel{margin-top:18px;padding:16px;border:1px solid #b7c7df;background:#f7fafe;border-radius:14px;display:grid;gap:11px}
+.smoke-panel .eyebrow{color:#3865a4}
+.smoke-panel h3{font-size:21px;margin:0;color:#192c46}
+.smoke-panel>p{font-size:12px;line-height:1.6;color:#5a6b83;margin:0}
+.smoke-panel .host-report{margin:5px 0;border:1px solid #dce6f2;border-radius:12px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr}
+.smoke-panel .host-report>div{padding:11px;display:grid;gap:4px;background:#fff;border-bottom:1px solid #eaf0f7}
+.smoke-panel .host-report span{font-size:10px;color:#667a91}
+.smoke-panel .host-report b{font-size:13px;overflow-wrap:anywhere;color:#1f3552}
+.smoke-panel .tertiary{border:1px solid #d4e0ef;border-radius:10px}
+.smoke-panel .gate-summary{background:#ebf3fd;padding:12px;border-radius:10px;line-height:1.5;font-size:12px;color:#314a6d}
+.smoke-panel .gate-summary strong{display:block}
+.smoke-panel .gate-summary ul{margin:7px 0 0;padding-left:20px}
+.smoke-panel .consent-row{padding:6px 0;margin:0}
+.smoke-panel .consent{font-size:12px;line-height:1.45}
+.smoke-panel .checkout-status{overflow-wrap:anywhere}
+@media(max-width:400px){.smoke-panel{padding:13px}.smoke-panel .host-report{grid-template-columns:1fr 1fr}.smoke-panel .host-report>div{padding:9px 8px}}
