@@ -1,5 +1,6 @@
 import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
+import { collectionQueue,collectionCsv,reminderDraft,validDueDay,type DueDays } from './collections.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
 import { checkPilotRequest,PILOT_LUNA,type PilotConfig } from './pilot-guard.ts';
@@ -14,7 +15,7 @@ import {
 import { loadPortfolio, savePortfolio } from './storage.ts';
 import { checkHost, explainHostError, submitUserApprovedPayment, type HostCheck } from './host.ts';
 
-type View = 'overview' | 'properties' | 'charges' | 'wallet';
+type View = 'overview' | 'properties' | 'charges' | 'collections' | 'wallet';
 const root = document.querySelector<HTMLDivElement>('#app');
 if (!root) throw new Error('Missing application mount element.');
 
@@ -22,6 +23,22 @@ let portfolio: Portfolio = loadPortfolio();
 let preview = false;
 let selectedView: View = 'overview';
 let workspaceMonth = currentPeriod();
+let collectionsPropertyFilter='';
+function localDay():string {
+  const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+const DUE_STORAGE_KEY='rentrail-due-settings-v1';
+function readDueDays():DueDays {
+  try {
+    const raw=localStorage.getItem(DUE_STORAGE_KEY);if(!raw)return {};
+    const parsed:unknown=JSON.parse(raw);
+    if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return {};
+    const rows=Object.entries(parsed);
+    if(rows.length>500 || rows.some(([id,day])=>!/^[a-f0-9]{32}$/.test(id)||!validDueDay(day)))return {};
+    return Object.fromEntries(rows) as DueDays;
+  }catch{return {};}
+}
+let dueDays=readDueDays();
 let filterProperty = '';
 let nextPeriodPreview: {period:string; count:number; skipped:number; next:string}|null=null;
 let publicAudit: PublicPaymentAudit | null = null;
@@ -232,6 +249,38 @@ function propertiesView(p:Portfolio):string {
   <section class="stack"><div class="section-heading"><h2>Buildings</h2><span class="count">${p.properties.length}</span></div>${cards||emptyState('No properties yet','Add your first building using the form.', 'properties','Get started')}</section></div>
   <p class="footnote">Private labels are held only in this device's local browser storage. Do not treat them as backed up or shared with other users.</p>`;
 }
+function collectionsView(p:Portfolio):string {
+  const today=localDay();
+  const filter=p.properties.some(x=>x.id===collectionsPropertyFilter)?collectionsPropertyFilter:'';
+  const report=collectionQueue(p,today,dueDays,filter);
+  const units=p.units.filter(u=>!filter||u.propertyId===filter);
+  const optionProperties=p.properties.map(x=>`<option value="${escapeHtml(x.id)}" ${x.id===filter?'selected':''}>${escapeHtml(x.name)}</option>`).join('');
+  const rows=report.lines.map(x=>`<article class="collection-row">
+    <div><strong>${escapeHtml(x.unitLabel)}</strong><small>${escapeHtml(x.propertyName)} · ${escapeHtml(x.period)} · Due ${escapeHtml(x.dueDate)}</small></div>
+    <div><strong>${formatNim(x.outstandingLuna)} NIM</strong><small>${escapeHtml(x.ageBucket)} · ${x.state==='TX_NEEDS_VERIFICATION'?'Wallet hash pending proof':'No verified settlement evidence'}</small></div>
+    <button class="tertiary" type="button" data-reminder="${escapeHtml(x.chargeId)}">Copy follow-up draft</button>
+  </article>`).join('');
+  return `<div class="page-title"><div><div class="eyebrow">RENTAL OPERATIONS · COLLECTIONS</div><h1>Act on the <em>unverified.</em></h1><p>Aging, due dates and follow-up drafts based on local obligations. Nothing here proves debt, payment or legal delinquency.</p></div></div>
+  <section class="collection-summary panel" aria-label="Collections review">
+    <div class="section-heading"><h2>Collections review · ${escapeHtml(today)}</h2><span class="count">Unverified local records only</span></div>
+    <div class="period-filters"><label>Property<select id="collections-property"><option value="">All properties</option>${optionProperties}</select></label></div>
+    <div class="period-metrics">
+      <div><small>Locally recorded outstanding</small><strong>${formatNim(report.outstandingLuna)} NIM</strong></div>
+      <div><small>Past local due date</small><strong>${formatNim(report.overdueLuna)} NIM</strong></div>
+      <div><small>Requests past due date</small><strong>${report.overdueCount}</strong></div>
+      <div><small>Submissions needing chain verification</small><strong>${report.awaitingProofCount}</strong></div>
+    </div>
+    <p class="form-hint">Past due date = no verified evidence linked to this local request. It does not establish legal rent arrears or nonpayment.</p>
+    <button id="download-collections" type="button" class="tertiary" ${!report.lines.length?'disabled':''}>Export local collections CSV</button>
+  </section>
+  <section class="panel"><h3>Unit-level due days</h3><p class="form-hint">Choose day 1–28 of each month. Saved only in this browser, never written to the blockchain.</p>
+    <div class="collection-due-grid">${units.map(u=>`<label class="collection-due-row"><span>${escapeHtml(p.properties.find(q=>q.id===u.propertyId)?.name||'')} · ${escapeHtml(u.label)}</span><select data-due-unit="${escapeHtml(u.id)}">${Array.from({length:28},(_,i)=>i+1).map(day=>`<option value="${day}" ${(dueDays[u.id]??1)===day?'selected':''}>${day}</option>`).join('')}</select></label>`).join('')||'<p>Add a property and unit to configure recurring due days.</p>'}</div>
+  </section>
+  <section class="panel"><div class="section-heading"><h2>Review and follow up</h2><span class="count">${report.lines.length} local requests</span></div>
+    <div class="collection-list">${rows||'<p class="form-hint">No charges in this property. Create a monthly obligation to begin.</p>'}</div>
+  </section>
+  <div class="safety"><span>${icon('shield')}</span><div><strong>Human review, not automated collection.</strong><p>All reminders are drafts. RentRail does not send messages, charge late fees, debit a wallet or report tenants as delinquent.</p></div></div>`;
+}
 function chargesView(p:Portfolio):string {
   return `<div class="page-title"><div><div class="eyebrow">RENT LEDGER</div><h1>Monthly <em>obligations.</em></h1><p>Requests and partial-payment accounting, without false confirmations.</p></div></div>
   <div class="two-col"><section class="panel"><h3>New rent obligation</h3><form id="charge-form" class="form-stack">
@@ -408,14 +457,14 @@ function independentAuditView(audit:PublicPaymentAudit):string {
 }
 function render():void {
   const p=activePortfolio();
-  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),wallet:walletView() + g3Panel(p)})[selectedView];
+  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),collections:collectionsView(p),wallet:walletView() + g3Panel(p)})[selectedView];
   root!.innerHTML=`<div class="app-shell ${tenantRequest||publicAudit||publicAuditError?'tenant-shell':''}">
     <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>CYCLE III · PAY</small></span></a>
-      <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('wallet','Wallet gate','wallet')}</nav>
+      <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('collections','Collections','calendar-clock')}${navButton('wallet','Wallet gate','wallet')}</nav>
       <div class="sidebar-bottom"><div class="side-note">${icon('shield')}<span>Non-custodial<br/><small>Evidence-first payments</small></span></div><div class="sidebar-footer">CYCLE III · PAY<br/>2026 BUILD</div></div>
     </aside><div class="main-wrap"><header class="topbar"><div class="mobile-brand">R<span>·</span><small>rentrail</small></div><span class="topbar-caption">${publicAudit?'RENT EVIDENCE':tenantRequest?'RENT PAYMENT':selectedView.toUpperCase()}</span><div class="topbar-right"><span class="label-chip">${preview?'EXAMPLE PREVIEW':'LOCAL WORKSPACE'}</span>${walletIndicator()}</div></header>
       <main class="main-content">${preview?`<div class="demo-banner">${icon('alert')} EXAMPLE PREVIEW ONLY — fictional units, no real payments. <button id="exit-preview">Exit preview</button></div>`:''}${content}${toast?`<div class="toast" role="status">${escapeHtml(toast)}</div>`:''}</main>
-      ${!tenantRequest&&!publicAudit&&!publicAuditError?`<nav class="mobile-nav" aria-label="Mobile navigation">${navButton('overview','Home','home')}${navButton('properties','Units','building')}${navButton('charges','Rent','receipt')}${navButton('wallet','Wallet','wallet')}</nav>`:''}
+      ${!tenantRequest&&!publicAudit&&!publicAuditError?`<nav class="mobile-nav" aria-label="Mobile navigation">${navButton('overview','Home','home')}${navButton('properties','Units','building')}${navButton('charges','Rent','receipt')}${navButton('collections','Review','calendar-clock')}${navButton('wallet','Wallet','wallet')}</nav>`:''}
     </div></div>`;
   if(!tenantRequest&&!tenantError&&!publicAudit&&!publicAuditError&&!p.properties.length&&selectedView==='overview'&&!preview) {
     const empty = document.createElement('div');
@@ -482,6 +531,37 @@ function bindEvents():void {
       success(`${result.generated} local invoice(s) created for ${result.newPeriod}. No NIM was sent.`);
     }catch(err){nextPeriodPreview=null;error(explainHostError(err));}
   });
+  root!.querySelector('#collections-property')?.addEventListener('change',e=>{
+    collectionsPropertyFilter=(e.target as HTMLSelectElement).value;render();
+  });
+  root!.querySelectorAll<HTMLSelectElement>('[data-due-unit]').forEach(input=>input.addEventListener('change',()=>{
+    if(preview)return;
+    const unit=input.dataset.dueUnit||'',day=Number(input.value);
+    if(!portfolio.units.some(u=>u.id===unit)||!validDueDay(day)){error('Invalid due day.');return;}
+    try{
+      const next={...dueDays,[unit]:day};
+      localStorage.setItem(DUE_STORAGE_KEY,JSON.stringify(next));dueDays=next;render();
+    }catch{error('Could not save due-day settings in this browser.');}
+  }));
+  root!.querySelector('#download-collections')?.addEventListener('click',()=>{
+    const report=collectionQueue(activePortfolio(),localDay(),dueDays,collectionsPropertyFilter);
+    if(!report.lines.length)return;
+    const blob=new Blob(['\\ufeff'+collectionCsv(report)],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');link.href=url;link.download='rentrail-local-review-'+localDay()+'.csv';link.click();
+    URL.revokeObjectURL(url);
+    success('Local collection review CSV exported. Not a bank statement or verified debt report.');
+  });
+  root!.querySelectorAll<HTMLButtonElement>('[data-reminder]').forEach(btn=>btn.addEventListener('click',async()=>{
+    const q=collectionQueue(activePortfolio(),localDay(),dueDays,collectionsPropertyFilter);
+    const line=q.lines.find(x=>x.chargeId===btn.dataset.reminder);
+    if(!line||preview)return;
+    const draft=reminderDraft(line);
+    try{
+      if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(draft);success('Review draft copied — no message sent.');}
+      else window.prompt('Copy and review reminder draft before sending',draft);
+    }catch{window.prompt('Copy and review reminder draft before sending',draft);}
+  }));
   root!.querySelector('#tenant-proof-form')?.addEventListener('submit',e=>{
     e.preventDefault();
     const form=e.target as HTMLFormElement;
