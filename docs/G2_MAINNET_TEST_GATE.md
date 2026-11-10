@@ -2,6 +2,16 @@
 
 **Date:** 2026-11-09 · **Branch:** `feat/mainnet-test-readiness` · **Target:** PAY · **Deadline:** Nov 11, 23:59 UTC.
 
+## Isolated read-only staging — READY (2026-11-09 local; 2026-11-10 UTC)
+- Vercel project: `rentrail-operations-staging` (`prj_tziXAepJ15AbEV2H3JKrPydeauhg`)
+- Target: **staging**, not production.
+- Deployment: `dpl_EfVAyztajgZQC19dMfbbxAuYhSPw`; **READY**.
+- Exact pinned source SHA: `a860dc9a7f6d27a4b8245475e301e3c0537b73f8`
+- URL: https://rentrail-operations-staging-3gny1uerl-faadil1s-projects.vercel.app/
+- Real SDK dependency + strict network check compile at that SHA. GitHub Actions `42749087224`: **156/156 tests PASS**, TypeScript/Vite build PASS.
+- Payment build flag **NOT SET** and approved recipient address **NOT SET**, so the staged app is read-only. No real native wallet transfer is initiated or enabled by this deployment.
+- G2 iPhone evidence of host-reported network and public RPC reachability on this exact version: **NOT_OBSERVED**. Captures are private unless their owner explicitly permits publication.
+
 ## What changed
 - Import `getHostNetwork()` from `@nimiq/mini-app-sdk` >=0.2.4. Host explicitly reports `mainnet`, `testnet` or `unknown`; **no fallback** to mainnet.
 - From a real tenant request, show host network + independent public RPC network and heights. SDK consensus alone is insufficient.
