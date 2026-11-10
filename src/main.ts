@@ -10,7 +10,7 @@ import { checkPublicMainnetRpc, verifyNimTransaction, type VerifyResult, type Rp
 import {
   addCharge, addProperty, addUnit, createId, emptyPortfolio, formatNim, makeMemo,
   parseNim, projectCharge, recordSubmission, shareableRequest, validateSharedRequest,
-  type Charge, type Portfolio, type SharedRequest, type ChargeViewStatus,
+  type Charge, type Portfolio, type SharedRequest, type ChargeViewStatus, type TransferEvidence,
 } from './domain.ts';
 import { loadPortfolio, savePortfolio } from './storage.ts';
 import { checkHost, explainHostError, submitUserApprovedPayment, type HostCheck } from './host.ts';
@@ -39,6 +39,8 @@ function readDueDays():DueDays {
   }catch{return {};}
 }
 let dueDays=readDueDays();
+// Ephemeral observations: never persisted as settled rent and never trusted after reload.
+let observedProofs:Record<string,TransferEvidence[]>={};
 let filterProperty = '';
 let nextPeriodPreview: {period:string; count:number; skipped:number; next:string}|null=null;
 let publicAudit: PublicPaymentAudit | null = null;
@@ -253,12 +255,12 @@ function propertiesView(p:Portfolio):string {
 function collectionsView(p:Portfolio):string {
   const today=localDay();
   const filter=p.properties.some(x=>x.id===collectionsPropertyFilter)?collectionsPropertyFilter:'';
-  const report=collectionQueue(p,today,dueDays,filter);
+  const report=collectionQueue(p,today,dueDays,filter,observedProofs);
   const units=p.units.filter(u=>!filter||u.propertyId===filter);
   const optionProperties=p.properties.map(x=>`<option value="${escapeHtml(x.id)}" ${x.id===filter?'selected':''}>${escapeHtml(x.name)}</option>`).join('');
   const rows=report.lines.map(x=>`<article class="collection-row">
     <div><strong>${escapeHtml(x.unitLabel)}</strong><small>${escapeHtml(x.propertyName)} · ${escapeHtml(x.period)} · Due ${escapeHtml(x.dueDate)}</small></div>
-    <div><strong>${formatNim(x.outstandingLuna)} NIM</strong><small>${escapeHtml(x.ageBucket)} · ${x.state==='TX_NEEDS_VERIFICATION'?'Wallet hash pending proof':'No verified settlement evidence'}</small></div>
+    <div><strong>${formatNim(x.outstandingLuna)} NIM</strong><small>${escapeHtml(x.ageBucket)} · ${x.state==='NODE_MATCH_THIS_SESSION'?'Single-node match observed this session; recheck later':x.state==='NODE_REVIEW_REQUIRED'?'Node mismatch requires review':x.state==='TX_NEEDS_VERIFICATION'?'Wallet hash pending proof':'No verified settlement evidence'}</small></div>
     <button class="tertiary" type="button" data-reminder="${escapeHtml(x.chargeId)}">Copy follow-up draft</button>
   </article>`).join('');
   return `<div class="page-title"><div><div class="eyebrow">RENTAL OPERATIONS · COLLECTIONS</div><h1>Act on the <em>unverified.</em></h1><p>Aging, due dates and follow-up drafts based on local obligations. Nothing here proves debt, payment or legal delinquency.</p></div></div>
@@ -271,7 +273,7 @@ function collectionsView(p:Portfolio):string {
       <div><small>Requests past due date</small><strong>${report.overdueCount}</strong></div>
       <div><small>Submissions needing chain verification</small><strong>${report.awaitingProofCount}</strong></div>
     </div>
-    <p class="form-hint">Past due date = no verified evidence linked to this local request. It does not establish legal rent arrears or nonpayment.</p>
+    <p class="form-hint">This session: ${formatNim(report.observedNodeLuna)} NIM reported matched across ${report.observedNodeCount} local requests by one public RPC. This is not persistent settlement or multi-node proof. Past due dates do not establish legal arrears or nonpayment.</p>
     <button id="download-collections" type="button" class="tertiary" ${!report.lines.length?'disabled':''}>Export local collections CSV</button>
   </section>
   <section class="panel"><h3>Unit-level due days</h3><p class="form-hint">Choose day 1–28 of each month. Saved only in this browser, never written to the blockchain.</p>
@@ -545,7 +547,7 @@ function bindEvents():void {
     }catch{error('Could not save due-day settings in this browser.');}
   }));
   root!.querySelector('#download-collections')?.addEventListener('click',()=>{
-    const report=collectionQueue(activePortfolio(),localDay(),dueDays,collectionsPropertyFilter);
+    const report=collectionQueue(activePortfolio(),localDay(),dueDays,collectionsPropertyFilter,observedProofs);
     if(!report.lines.length)return;
     const blob=new Blob(['\\ufeff'+collectionCsv(report)],{type:'text/csv;charset=utf-8'});
     const url=URL.createObjectURL(blob);
@@ -554,7 +556,7 @@ function bindEvents():void {
     success('Local collection review CSV exported. Not a bank statement or verified debt report.');
   });
   root!.querySelectorAll<HTMLButtonElement>('[data-reminder]').forEach(btn=>btn.addEventListener('click',async()=>{
-    const q=collectionQueue(activePortfolio(),localDay(),dueDays,collectionsPropertyFilter);
+    const q=collectionQueue(activePortfolio(),localDay(),dueDays,collectionsPropertyFilter,observedProofs);
     const line=q.lines.find(x=>x.chargeId===btn.dataset.reminder);
     if(!line||preview)return;
     const draft=reminderDraft(line);
@@ -649,6 +651,19 @@ async function onVerifyG3(form:HTMLFormElement):Promise<void>{
     const result=await verifyNimTransaction({hash:txHashInput,recipient:charge.recipient,memo:charge.memo,amountLuna:charge.amountLuna,allowPartial:true});
     txVerifyResult=result;
     txVerifiedChargeId=charge.id;
+    if(result.state==='FINAL_MATCHED'&&Number.isSafeInteger(result.amountLuna)&&result.amountLuna!>0){
+      const hash=result.hash.toLowerCase();
+      const existsAcrossCharge=Object.entries(observedProofs).some(([id,proofs])=>id!==charge.id&&proofs.some(p=>p.hash===hash));
+      if(!existsAcrossCharge){
+        const prior=observedProofs[charge.id]??[];
+        if(!prior.some(p=>p.hash===hash)){
+          observedProofs={...observedProofs,[charge.id]:[...prior,{
+            network:'nimiq-mainnet',hash,recipient:charge.recipient,memo:charge.memo,
+            amountLuna:result.amountLuna,status:'FINAL_VERIFIED'
+          }]};
+        }
+      }
+    }
   }catch{
     txVerifyResult=null;
     error('Unable to verify. No payment has been credited.');
