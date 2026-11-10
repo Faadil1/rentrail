@@ -1,5 +1,6 @@
 import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
+import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { createPaymentAudit, decodePaymentAudit, auditUrl, type PublicPaymentAudit } from './audit.ts';
 import { checkPublicMainnetRpc, verifyNimTransaction, type VerifyResult, type RpcNetworkCheck } from './rpc.ts';
 import {
@@ -41,9 +42,13 @@ let toast = '';
 let tenantRequest: SharedRequest | null = null;
 let tenantError = '';
 // Preview is host-connection-only. Never send NIM until a reviewed verifier and human gate exist.
-const paymentEnabled = false;
+// NEVER enabled in ordinary staging. Separate explicit human approval is required
+// before producing any dedicated one-time smoke-test deployment.
+const paymentEnabled = import.meta.env.VITE_ENABLE_LIVE_NIM_SEND === 'smoke_test_human_approved';
 let paymentBusy = false;
 let paymentAcknowledged = false;
+let recipientAcknowledged = false;
+let realMoneyAcknowledged = false;
 let submittedHash: string | null = null;
 let outcomeUnknown = false;
 // Prevent an accidental duplicate request after reloading a tenant's browser.
@@ -224,12 +229,12 @@ function chargesView(p:Portfolio):string {
 }
 function walletView():string {
   return `<div class="page-title"><div><div class="eyebrow">NIMIQ PAY · HOST GATE</div><h1>Wallet <em>connection.</em></h1><p>Check the actual Mini App provider, not a standalone Safari browser tab.</p></div></div>
-  <div class="wallet-panel"><div class="wallet-large">${icon('wallet')}</div><h2>${hostStatus==='connected'?'SDK provider detected':'Connect Nimiq Pay'}</h2><p class="wallet-copy">${hostStatus==='connected' ? (check?.consensus?'Nimiq Pay SDK responded and reported consensus. The chain network is NOT independently attested.':'Provider found but consensus is not established.') : 'Open this app from Nimiq Pay → Mini Apps to authorize SDK access. Browsers alone do not inject the wallet provider.'}</p>
+  <div class="wallet-panel"><div class="wallet-large">${icon('wallet')}</div><h2>${hostStatus==='connected'?'SDK provider detected':'Connect Nimiq Pay'}</h2><p class="wallet-copy">${hostStatus==='connected' ? (check?.consensus?'Nimiq Pay SDK responded. Its reported wallet network is shown below, separately from public mainnet RPC. Both must be checked before considering any payment.':'Provider found but consensus is not established.') : 'Open this app from Nimiq Pay → Mini Apps to authorize SDK access. Browsers alone do not inject the wallet provider.'}</p>
   <button id="check-host" class="primary" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='checking'?'Checking…':'Check host'} ${icon('arrow')}</button>
   ${hostStatus==='error'?`<div class="inline-alert">${icon('alert')} ${escapeHtml(hostMessage)}</div>`:''}
-  ${hostStatus==='connected'?`<div class="host-report"><div><span>Host provider</span><b>Detected</b></div><div><span>Consensus</span><b>${check?.consensus?'Established':'Unavailable'}</b></div><div><span>Block height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>Balance method</span><b>${check?.balanceReadAvailable?'Available':'Missing / old host'}</b></div><div><span>Mainnet attested</span><b>No — separate RPC gate</b></div></div>`:''}
+  ${hostStatus==='connected'?`<div class="host-report"><div><span>Host provider</span><b>Detected</b></div><div><span>Consensus</span><b>${check?.consensus?'Established':'Unavailable'}</b></div><div><span>Block height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>Balance method</span><b>${check?.balanceReadAvailable?'Available':'Missing / old host'}</b></div><div><span>Wallet network (host-reported)</span><b>${escapeHtml((check?.network??'unknown').toUpperCase())}</b></div><div><span>Independent mainnet</span><b>${rpcNetwork?.state==='MAINNET_REPORTED'?'Public RPC only':'Not verified'}</b></div></div>`:''}
   </div>
-  <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>This Preview cannot initiate a wallet payment. A future explicitly approved payment flow will require native Nimiq Pay confirmation. We never request private keys or equate a hash with final settlement.</p></div></div>`;
+  <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>Normal previews cannot initiate wallet payment. A dedicated, human-approved capped mainnet test build would additionally require fresh host + public RPC checks and native confirmation. We never request private keys or equate a hash with final settlement.</p></div></div>`;
 }
 function g3Panel(p:Portfolio):string {
   const charges = preview ? [] : p.charges;
@@ -269,18 +274,50 @@ function decodeRequest(encoded:string):SharedRequest {
   const text=atob(base64);
   return validateSharedRequest(JSON.parse(text));
 }
+function smokeAssessment(request:SharedRequest):SmokeAssessment{
+  return assessSmokePayment({
+    buildAllowsSmoke:paymentEnabled,
+    walletNetwork:check?.network??'unknown',
+    consensus:hostStatus==='connected' && check?.consensus===true,
+    walletBlockHeight:check?.blockHeight??null,
+    hostCheckedAtMs:check?.checkedAtMs??null,
+    publicRpcNetwork:rpcNetwork?.state==='MAINNET_REPORTED'?rpcNetwork.network??null:null,
+    publicRpcBlockHeight:rpcNetwork?.headHeight??null,
+    publicRpcObservedAt:rpcNetwork?.observedAt??null,
+    nowMs:Date.now(),amountLuna:request.amountLuna,
+    recipientCheckAcknowledged:recipientAcknowledged,
+    realMoneyAcknowledged,
+    walletApprovalAcknowledged:paymentAcknowledged,
+    priorAttemptUnresolved:!!submittedHash||outcomeUnknown||paymentBusy,
+    recipient:request.recipient,memo:request.memo
+  });
+}
 function tenantView(request:SharedRequest):string {
+  const gate=smokeAssessment(request);
+  const warnings=gate.reasons.filter(x=>x!=='This build is read-only. Payments are disabled.');
+  const walletNetwork=check?.network??'unknown';
+  const rpcNetworkLabel=rpcNetwork?.state==='MAINNET_REPORTED'?'MainAlbatross':'NOT VERIFIED';
   return `<div class="checkout"><div class="checkout-head"><div class="eyebrow">TENANT PAYMENT REQUEST</div><h1>Rent, with <em>clarity.</em></h1><p>Review these instructions against your trusted landlord contact before moving any NIM.</p></div>
   <div class="checkout-card"><span class="checkout-label">${escapeHtml(request.period)} rent obligation</span><div class="checkout-value">${formatNim(request.amountLuna)} <span>NIM</span></div><div class="hr"></div>
     <div class="detail"><span>Recipient</span><strong class="mono">${escapeHtml(request.recipient)}</strong></div>
     <div class="detail"><span>Public memo</span><strong class="mono">${escapeHtml(request.memo)}</strong></div>
     <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(request.chargeId.slice(0,10))}…</strong></div>
     <div class="inline-alert">${icon('alert')} Link contents can be altered by anyone sharing it. Verify the recipient with your landlord independently. This request does not prove identity or a legal debt.</div>
-    <div class="consent-row"><label class="consent"><input id="ack-payment" type="checkbox" ${paymentAcknowledged?'checked':''}/> I independently verified the recipient and understand Nimiq Pay may be set to testnet or mainnet. A submitted transfer is not a verified rent receipt.</label></div>
-    <button id="send-payment" class="primary full" type="button" ${!paymentEnabled||!paymentAcknowledged||paymentBusy||outcomeUnknown||submittedHash?'disabled':''}>${!paymentEnabled?'Payments locked — host test only':paymentBusy?'Waiting for wallet…':submittedHash?'Submitted — not verified':outcomeUnknown?'Outcome unknown — check wallet':'Request NIM payment approval'} ${icon('arrow')}</button>
-    <button class="tertiary full" id="tenant-check-host" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='connected'?'Recheck Nimiq Pay':'Check Nimiq Pay host'}</button>
-    <div class="checkout-status">${hostMessage ? escapeHtml(hostMessage) : hostStatus==='connected' ? `Wallet bridge: detected · Consensus ${check?.consensus?'established':'not ready'}` : hostStatus==='error'?escapeHtml(hostMessage):'Wallet bridge not yet verified on this device.'}</div>
-    ${submittedHash?`<div class="pending-result"><strong>Submitted, NOT verified as paid</strong><span class="mono">${escapeHtml(submittedHash)}</span><p>Check your wallet history. No independent finality/reconciliation has been performed in this build.</p></div>`:''}
+    <div class="smoke-panel" aria-label="Controlled mainnet test safety">
+      <div class="eyebrow">G2 · REAL MONEY SAFETY CHECK</div>
+      <h3>One small, controlled transaction</h3>
+      <p>This flow is for a separately approved test payment only, not actual rent. Maximum <strong>${formatNim(SMOKE_MAX_LUNA)} NIM</strong> on mainnet plus any wallet fee. Payment is permanently disabled in normal previews.</p>
+      <div class="host-report"><div><span>Wallet network</span><b>${escapeHtml(walletNetwork.toUpperCase())}</b></div><div><span>Independent public RPC</span><b>${escapeHtml(rpcNetworkLabel)}</b></div><div><span>SDK height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>RPC height</span><b>${rpcNetwork?.headHeight??'Unknown'}</b></div></div>
+      <button class="tertiary full" id="tenant-check-host" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='connected'?'Recheck Nimiq Pay':'Check Nimiq Pay host'}</button>
+      <button class="tertiary full" id="tenant-check-rpc" type="button" ${rpcChecking?'disabled':''}>${rpcChecking?'Checking RPC…':'Check independent mainnet RPC'}</button>
+      <div class="gate-summary" role="status">${!paymentEnabled?'<strong>Read-only deployment — payment intentionally disabled.</strong>':gate.allowed?'<strong>Safety checks passed; wallet approval is still required.</strong>':`<strong>Wallet test blocked:</strong><ul>${warnings.map(reason=>`<li>${escapeHtml(reason)}</li>`).join('')}</ul>`}</div>
+      <div class="consent-row"><label class="consent"><input id="ack-recipient" type="checkbox" ${recipientAcknowledged?'checked':''}/> I confirmed the recipient's address through a trusted channel outside this editable link.</label></div>
+      <div class="consent-row"><label class="consent"><input id="ack-real-money" type="checkbox" ${realMoneyAcknowledged?'checked':''}/> I understand this will move REAL NIM if I approve it in Nimiq Pay.</label></div>
+      <div class="consent-row"><label class="consent"><input id="ack-payment" type="checkbox" ${paymentAcknowledged?'checked':''}/> I will review amount, recipient, fee and memo again in the native wallet approval dialog. A hash is not a rent receipt.</label></div>
+      <button id="send-payment" class="primary full" type="button" ${gate.allowed?'':'disabled'}>${paymentBusy?'Waiting for wallet…':submittedHash?'Submitted — not verified':outcomeUnknown?'Outcome unknown — do not retry':paymentEnabled?'Request Nimiq Pay native approval':'Payments locked — read-only'} ${icon('arrow')}</button>
+      <div class="checkout-status">${hostMessage?escapeHtml(hostMessage):'No native wallet transfer initiated.'}</div>
+    </div>
+    ${submittedHash?`<div class="pending-result"><strong>Submitted, NOT verified as paid</strong><span class="mono">${escapeHtml(submittedHash)}</span><p>Hash is not proof of payment. Paste/recheck the hash in the read-only verification panel below; do not retry if its status is uncertain.</p></div>`:''}
     ${outcomeUnknown?`<div class="pending-result"><strong>Outcome unknown — DO NOT retry yet</strong><p>Inspect Nimiq Pay transaction history and independently verify on-chain before attempting another payment.</p></div>`:''}
   </div>${tenantEvidencePanel(request)}<p class="checkout-foot">RentRail is non-custodial. Payment approval happens inside Nimiq Pay, never in this page.</p></div>`;
 }
@@ -414,7 +451,10 @@ function bindEvents():void {
   g3Form?.addEventListener('input',()=>{txVerifyResult=null;const card=root!.querySelector('#g3-result');if(card)card.textContent='Parameters changed. Verify the new transaction hash before trusting prior results.';});
   root!.querySelector('#check-host')?.addEventListener('click',()=>void onHostCheck());
   root!.querySelector('#tenant-check-host')?.addEventListener('click',()=>void onHostCheck());
+  root!.querySelector<HTMLInputElement>('#ack-recipient')?.addEventListener('change',e=>{recipientAcknowledged=(e.target as HTMLInputElement).checked;render();});
+  root!.querySelector<HTMLInputElement>('#ack-real-money')?.addEventListener('change',e=>{realMoneyAcknowledged=(e.target as HTMLInputElement).checked;render();});
   root!.querySelector<HTMLInputElement>('#ack-payment')?.addEventListener('change',e=>{paymentAcknowledged=(e.target as HTMLInputElement).checked;render();});
+  root!.querySelector('#tenant-check-rpc')?.addEventListener('click',()=>void onRpcCheck());
   root!.querySelector('#send-payment')?.addEventListener('click',()=>void onTenantPay());
 }
 
@@ -492,12 +532,16 @@ async function onHostCheck():Promise<void>{
   render();
 }
 async function onTenantPay():Promise<void>{
-  if(!paymentEnabled||!tenantRequest||!paymentAcknowledged||paymentBusy||submittedHash||outcomeUnknown)return;
-  if(!check||hostStatus!=='connected'||!check.consensus){error('Check Nimiq Pay host and established consensus before requesting wallet approval.');return;}
+  if(!tenantRequest||paymentBusy||submittedHash||outcomeUnknown)return;
+  const gate=smokeAssessment(tenantRequest);
+  if(!gate.allowed||!check||hostStatus!=='connected'){
+    error(gate.reasons[0]||'The native host is not ready. No payment requested.');return;
+  }
   paymentBusy=true;render();
   try{
-    const hash=await submitUserApprovedPayment(check.provider,tenantRequest);
+    const hash=await submitUserApprovedPayment(check,tenantRequest,gate);
     submittedHash=hash;
+    tenantHash=hash;
     hostMessage='';
     try{localStorage.setItem(localPaymentKey(tenantRequest.chargeId),JSON.stringify({status:'SUBMITTED_UNVERIFIED',hash}));}catch{/* Storage may be blocked; user must retain wallet history. */}
     // Tenant view may belong to a different device; no synced settlement assertion.
