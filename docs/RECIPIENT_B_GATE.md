@@ -39,4 +39,4 @@ The user-provided address has:
 - Confirm B controls its separate receiving wallet out of band. **DO NOT SEND FUNDS YET**.
 - Only after owner explicitly approves the specific pilot payment will a distinct isolated, capped and allowlisted test-capable deployment be considered.
 
-Evidence state: **address checksum PASS; real payment NOT_PERFORMED; G3 matching NOT_VERIFIED; general rent payments not enabled; competition submission pending.**
+Evidence state: **address checksum PASS; iPhone host/RPC alignment PASS; B absent from 2 shared payer-wallet addresses PASS (observational); B ownership and payer balance NOT VERIFIED; real payment NOT PERFORMED; G3 matching NOT VERIFIED; payment-enabled build NOT APPROVED; competition submission pending.**
