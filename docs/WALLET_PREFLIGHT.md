@@ -2,6 +2,17 @@
 
 Date: 2026-11-09 late EST / 2026-11-10 UTC. Stacked on `feat/mainnet-test-readiness`.
 
+## Read-only staging evidence — 2026-11-10 UTC
+
+- Vercel non-production target: **staging**, existing isolated project `rentrail-operations-staging` (`prj_tziXAepJ15AbEV2H3JKrPydeauhg`).
+- Deployment: `dpl_EdUztibx3LE2Dn2cs47inY2x9ScL` — **READY**.
+- Exact deployed source SHA: `e65016ef63df054367ee36d23df961f0d9db43ea`.
+- HTTPS: https://rentrail-operations-staging-a85sdulra-faadil1s-projects.vercel.app/
+- GitHub Actions: https://github.com/Faadil1/rentrail/actions/runs/42759103522 — **SUCCESS**, **180/180 tests**, TypeScript and Vite build.
+- No Vercel project env vars present at deploy time, including **neither** money-moving switch nor recipient allowlist. This exact staged app **cannot request NIM transfers**.
+- New `listAccounts()` and `getBalance()` view **NOT YET TESTED ON DEVICE**. Balance of roughly 1 NIM is user-reported; not confirmed through Nimiq SDK.
+- User already saw SDK MAINNET and independent RPC mainnet with seven-block drift in previous iPhone recording, but the new address read is a separate gate.
+
 ## Human-reported balance vs verified wallet balance
 
 User reports having **about 1 NIM** in the Nimiq Pay wallet connected to RentRail. This is user-provided context, NOT a verified SDK balance or proof of which public account will be selected for sending.
