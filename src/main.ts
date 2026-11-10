@@ -1,6 +1,7 @@
 import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
+import { isValidNimiqAddress } from './address-validation.ts';
 import { inspectWalletAddresses, receivingAddressAssessment, type WalletPreflight } from './wallet-preflight.ts';
 import { createPaymentAudit, decodePaymentAudit, auditUrl, type PublicPaymentAudit } from './audit.ts';
 import { checkPublicMainnetRpc, verifyNimTransaction, type VerifyResult, type RpcNetworkCheck } from './rpc.ts';
@@ -326,6 +327,7 @@ function tenantView(request:SharedRequest):string {
   return `<div class="checkout"><div class="checkout-head"><div class="eyebrow">TENANT PAYMENT REQUEST</div><h1>Rent, with <em>clarity.</em></h1><p>Review these instructions against your trusted landlord contact before moving any NIM.</p></div>
   <div class="checkout-card"><span class="checkout-label">${escapeHtml(request.period)} rent obligation</span><div class="checkout-value">${formatNim(request.amountLuna)} <span>NIM</span></div><div class="hr"></div>
     <div class="detail"><span>Recipient</span><strong class="mono">${escapeHtml(request.recipient)}</strong></div>
+    <div class="address-check" role="status">${isValidNimiqAddress(request.recipient)?'NQ checksum valid — recipient ownership is NOT verified.':'WARNING: recipient NQ checksum INVALID — do not send any funds.'}</div>
     <div class="detail"><span>Public memo</span><strong class="mono">${escapeHtml(request.memo)}</strong></div>
     <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(request.chargeId.slice(0,10))}…</strong></div>
     <div class="inline-alert">${icon('alert')} Link contents can be altered by anyone sharing it. Verify the recipient with your landlord independently. This request does not prove identity or a legal debt.</div>
