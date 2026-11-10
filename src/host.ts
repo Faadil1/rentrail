@@ -42,6 +42,10 @@ export async function submitUserApprovedPayment(
   if(import.meta.env.VITE_ENABLE_LIVE_NIM_SEND!=='smoke_test_human_approved')
     throw Error('This build is read-only; sending NIM is disabled.');
   if(!assessment.allowed) throw Error('Independent safety and consent gate did not pass.');
+  const allowedRecipient=import.meta.env.VITE_SMOKE_ALLOW_RECIPIENT;
+  if(typeof allowedRecipient!=='string'||!allowedRecipient.trim()||
+     allowedRecipient.replace(/\s+/g,'').toUpperCase()!==request.recipient.replace(/\s+/g,'').toUpperCase())
+    throw Error('Payment recipient is not included in the approved smoke-test build allowlist.');
   const payload=validateSharedRequest(request);
   if(!isSafeLuna(payload.amountLuna)||payload.amountLuna>SMOKE_MAX_LUNA)
     throw Error('The maximum explicitly controlled smoke amount is 0.01 NIM.');
