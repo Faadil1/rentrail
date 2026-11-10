@@ -1,8 +1,30 @@
 # G2 — User-approved 500-Luna pilot, isolated Staging
 
-Date: 2026-11-10 UTC. **Status: deployed test-capable but NO MONEY SENT.**
+Date: 2026-11-10 UTC. **Status: ONE USER-APPROVED MAINNET TRANSFER OBSERVED; public RPC reports FINAL_MATCHED; pilot endpoint now protected. No further transfers authorized.**
 Branch: `feat/authorized-500-luna-pilot` (stacked on `feat/recipient-b-preflight`).
 Build source SHA: `f736e50d10b1875b5b98ba9c74479ea914c391e8`.
+
+## Observed first paid test — PASS with critical native amount-display discrepancy
+
+Private user-provided 33.4-second iPhone screen recording, local start time approximately **2026-11-10 01:01 EST**, shows the exact Nimiq Pay-hosted pilot:
+- Nimiq Pay network and public RPC both report MAINNET/MainAlbatross with near-identical recent block heights; two payer addresses shared and B absent from the shared list.
+- App's fictional payment request and safety panel show **0.005 NIM (500 Luna)**, B recipient and correct opaque `RR1:62b40b30…` memo.
+- **CRITICAL DISPLAY DISCREPANCY:** the native Nimiq Pay **Confirm Transaction** sheet showed recipient `NQ48…E1QT` and **"Amount 0.01 NIM"**, despite the Mini App's exact approved instruction being **0.005 NIM**. The cause (possibly decimal-place rounding) is NOT VERIFIED. Do not claim the dialog displayed the correct value; do not perform another micro-payment before this is resolved or communicated.
+- User was observed confirming the native dialog and RentRail subsequently displayed **"Submitted, NOT verified as paid"** with a public 64-hex hash. Hash is abbreviated **`8bd75eabcd…a583888c`** here to avoid publicly linking user's payer/receiver wallets to their personal GitHub identity. Full hash available in the user's private chat. Recording stays private.
+- A separate **read-only** Vercel build remotely queried `https://rpc.nimiqwatch.com/` `getTransactionByHash` plus consensus, head, canonical block inclusion, transaction list, later macroblock. At **2026-11-10T06:08:36.756Z**, the public node reported:
+  - `hash match: true`; `networkId=24`; `executionResult=true`; **actual amount = 500 Luna** (exact match, **not 1000 Luna**).
+  - Recipient equals the separately approved wallet B; memo bytes decode to the exact opaque `RR1` reference.
+  - Included in canonical microblock **66,504,678** (transaction appeared in block list).
+  - Later canonical macroblock **66,504,720** present; head **66,505,079**; mainnet report and RPC consensus true.
+  - Verifier result **FINAL_MATCHED** on **one third-party public RPC history node**. This is strong implementation evidence but NOT independently replicated multi-node light-client proof or legally discharged rent. Public audit tool was separately built with **no wallet method or send capability**.
+- **Bottom line:** user-authorized mainnet NIM transfer to B and exact programmatic on-chain reconciliation **PASS (single-node reported)**; **native sheet amount display FAIL/REVIEW REQUIRED**; real general rent-sized PAY not yet released.
+
+### Pilot protection after observed completion
+- Dedicated pilot Vercel project `rentrail-g2-pilot-500`: **Vercel Authentication enabled for deploymentType=all** after the test (SSO). This restricts unauthenticated access to original deployment; whether any stale authenticated session remains is not independently verified.
+- Project's `VITE_ENABLE_LIVE_NIM_SEND` setting was changed to a **disabled** value for any subsequent builds. **Already-built immutable static JS still includes its previously enabled code**, so SSO is the operative protection for the existing deployment. Do not assume editing an environment variable revokes a previously compiled static bundle.
+- Browser-local attempt gate reports "Previous send is unresolved; do not retry", even though public chain evidence is now observed. This is conservative; a real resolved-proof state flow is future work and requires user consent before new payments.
+- The Mini App also displays stale text **"No native wallet transfer initiated"** after hash return: UX status bug to fix. Do not describe that string as evidence of zero transfers.
+- **No second test authorized or needed.** Keep pilot project protected, not publicly accessible, and never attempt the same request again.
 
 ## Human authorization and immutable intent
 The Nimiq Pay wallet holder explicitly authorized **PREPARING** a distinct test-capable environment for one manually approved `0.005 NIM` (`500 Luna`) mainnet transfer, plus any fee shown by Nimiq Pay, from wallet A to the separately controlled wallet B. They must still personally accept the native wallet confirmation. No agent, developer or CI will click that confirmation.
@@ -35,7 +57,7 @@ The Nimiq Pay wallet holder explicitly authorized **PREPARING** a distinct test-
 4. Before invoking native wallet request, localStorage records an **ATTEMPT_STARTED/OUTCOME_UNKNOWN** state. Page reload on the same origin remains blocked from a blind retry, including cancellation or uncertain response. This is a **browser-local defense**, NOT a true globally enforced one-time authorization; another device, cleared storage or changed clock may bypass it. Each native wallet request still requires human consent.
 5. Returned transaction hash is **SUBMITTED_UNVERIFIED**, never “paid”. Read-only RPC G3 requires matching canonical transfer + later macroblock; no rental ledger auto-credit.
 
-## Human acceptance path (do not auto-transfer)
+## Original human acceptance protocol (historical, pilot completed; DO NOT repeat)
 
 1. Open the exact **private fictional payment request URL** from the chat inside Nimiq Pay Mini Apps → Custom URL (not Safari). Do not post the public wallet link to the competition's GitHub PR.
 2. Check recipient displayed is exactly wallet B, amount **0.005 NIM**, memo `RR1:62b40b301f8829c113e7e5a622840450`. Confirm wallet B ownership out of band.
@@ -48,7 +70,7 @@ The Nimiq Pay wallet holder explicitly authorized **PREPARING** a distinct test-
 
 ## Unverified facts
 - **NO human transfer has occurred from this deployment.**
-- No real RentRail transaction hash or macroblock finality has been observed.
-- The sender account selection and its available balance/fees are not independently verified.
+- **One actual mainnet pilot hash has been observed and single-node-reported as FINAL_MATCHED**; NOT cryptographically attested by a second independent provider. Do not repeat the pilot.
+- Wallet displayed the native approval dialog; sender account selection and actual fee paid are not separately documented here. Native modal displayed 0.01 NIM, while chain recorded 0.005 NIM: **critical display ambiguity to resolve**.
 - Existing PRs are not merged, final competition submission is NOT performed.
 - A single controlled 0.005 NIM transfer is evidence for the native SDK, **not** a general authorization to send rent-sized sums nor proof of a legally settled rent.
