@@ -1,4 +1,5 @@
 import { isValidNimiqAddress } from './address-validation.ts';
+import { checkPilotRequest } from './pilot-guard.ts';
 import { init, getHostNetwork, NimiqProviderError } from '@nimiq/mini-app-sdk';
 import { SMOKE_MAX_LUNA, type NimiqHostNetwork, type SmokeAssessment } from './smoke-gate.ts';
 import { isSafeLuna, validateSharedRequest, looksLikeNimiqAddress, normalizeAddress, type SharedRequest } from './domain.ts';
@@ -49,6 +50,13 @@ export async function submitUserApprovedPayment(
      allowedRecipient.replace(/\s+/g,'').toUpperCase()!==request.recipient.replace(/\s+/g,'').toUpperCase())
     throw Error('Payment recipient is not included in the approved smoke-test build allowlist.');
   const payload=validateSharedRequest(request);
+  const pilot=checkPilotRequest(payload,{
+    recipient:import.meta.env.VITE_SMOKE_ALLOW_RECIPIENT,
+    chargeId:import.meta.env.VITE_SMOKE_ALLOW_CHARGE_ID,
+    amountLuna:import.meta.env.VITE_SMOKE_ALLOW_AMOUNT_LUNA,
+    period:import.meta.env.VITE_SMOKE_ALLOW_PERIOD,
+  });
+  if(!pilot.allowed)throw Error('This is not the uniquely approved 500-Luna pilot. '+pilot.reasons[0]);
   if(!isSafeLuna(payload.amountLuna)||payload.amountLuna>SMOKE_MAX_LUNA)
     throw Error('The maximum explicitly controlled smoke amount is 0.01 NIM.');
   if(host.network!=='mainnet'||getHostNetwork()!=='mainnet')
@@ -64,6 +72,9 @@ export async function submitUserApprovedPayment(
   if(shared.some(a=>normalizeAddress(a)===normalizeAddress(payload.recipient))){
     throw Error('Self-transfer risk: recipient belongs to this payer wallet; Nimiq forbids sender = recipient. No payment requested.');
   }
+  // Do not leave wallet permission open for minutes and reuse old chain checks.
+  if(Date.now()-host.checkedAtMs>120_000||host.checkedAtMs>Date.now()+10_000)
+    throw Error('Host check expired during permission handling. Recheck mainnet and do not retry until the wallet history is reviewed.');
   // Native wallet confirmation is mandatory. No seed phrase or private key is requested.
   const hash=await host.provider.sendBasicTransactionWithData({
     recipient:payload.recipient, value:payload.amountLuna, data:payload.memo,
