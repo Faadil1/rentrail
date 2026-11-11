@@ -23,7 +23,7 @@ The role selector is a **presentation preference only**. It is not user authenti
 - One-sentence answer first: "Know which rent. Know which payment."
 - Five actionable setup/reconciliation steps for owners; transparent four-step safety workflow for tenants; three-step safe example for reviewers.
 - Human-readable payment glossary: **Requested**, **Sent / hash received**, **Matched on-chain**, **Needs review**. All explicitly distinguish *transaction hash* from *independent verification* and *legal rental discharge*.
-- A **standalone existing-payment verification form** on the Wallet page: exact public hash (64 hexadecimal chars), checksum-valid NQ recipient, up-to-five-decimal NIM amount and exact `RR1:<32hex>` memo. Parsing is strict; no wallet permission or money-moving API is called.
+- A **standalone existing-payment verification form** on the Wallet page: exact public hash (64 hexadecimal chars), checksum-valid NQ recipient, up-to-five-decimal NIM amount and exact `RR1:<32hex>` memo. Parsing is strict; no wallet permission or money-moving API is called. Exact matched amounts are distinguished from **partial matched amounts with remaining NIM**, and overpayments remain REVIEW_REQUIRED.
 - Read-only tenant request page now starts with 3 plain-language steps and collapses the historical one-off live-send controls under "Technical wallet checks".
 - Responsive typography, keyboard focus-visible, compact mobile role cards, clear error states, friendly copy and no fabricated sample transaction.
 
@@ -52,11 +52,11 @@ During the user-approved G2 pilot, a wallet transferred 500 Luna (0.005 NIM), in
 - `src/journey.ts`: three guided paths, step truth/status, read-only standalone input parsing and human status explanations.
 - `src/main.ts`: home role selector / journey UI, tenant-first guide, standalone check, two device-responsive paths, verified-proof states. No changes to the money-moving adapter.
 - `src/styles.css`: responsive stepper, audience selector, plain-language status grid and simplified request guide.
-- `tests/journey.test.ts`: 18 tests for role allowlisting, owner progression and no fake completion, tenant safety, example mode, strictly checked NQ recipient/transaction hash/memo/NIM decimal, human status meaning.
+- `tests/journey.test.ts`: 23 tests for role allowlisting, owner progression and no fake completion, tenant safety, example mode, strict NQ recipient/transaction hash/memo/NIM decimal, exact/partial/full payment interpretation, overpayment review, and human status meaning.
 
 ## Release gates
 
-1. **255+ automated tests** and TypeScript/Vite build green.
+1. **260+ automated tests** and TypeScript/Vite build green.
 2. Deploy *only* to a **non-money-moving staging project** with no `VITE_ENABLE_LIVE_NIM_SEND` or approved recipient variables.
 3. Verify mobile layout and SDK host in actual Nimiq Pay iPhone WebView (must remain NOT VERIFIED until observed).
 4. Check that guest/tenant/owner flow is understandable within 30 seconds without instructions and clear that the public build cannot pay.
