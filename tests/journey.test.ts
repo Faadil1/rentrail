@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {emptyPortfolio,addProperty,addUnit,addCharge,makeMemo} from '../src/domain.ts';
-import {validAudience,journeySteps,parseManualPaymentReview,statusExplanations} from '../src/journey.ts';
+import {validAudience,journeySteps,parseManualPaymentReview,describeManualProof,statusExplanations} from '../src/journey.ts';
 
 const addr='NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 const id='a'.repeat(32),hash='b'.repeat(64);
@@ -68,4 +68,27 @@ test('glossary has four human-readable non-false states',()=>{
  assert.equal(statusExplanations.length,4);
  assert.match(statusExplanations[1].description,/alone does not confirm/);
  assert.match(statusExplanations[2].description,/one public mainnet node/i);
+});
+
+test('full node-reported match is exact but never a legal receipt',()=>{
+ const r=describeManualProof(500,500,'FINAL_MATCHED');
+ assert.equal(r.kind,'EXACT_NODE_MATCH');assert.equal(r.remainingLuna,0);
+});
+test('partial node-reported transfer displays residual NIM rather than falsely settled',()=>{
+ const r=describeManualProof(500,250,'FINAL_MATCHED');
+ assert.equal(r.kind,'PARTIAL_NODE_MATCH');assert.equal(r.remainingLuna,250);
+});
+test('overpayment is review required, not a fully paid status',()=>{
+ const r=describeManualProof(500,750,'FINAL_MATCHED');
+ assert.equal(r.kind,'REVIEW_REQUIRED');assert.equal(r.remainingLuna,null);
+});
+test('submitted hash or unfinalized claim is never treated as verified',()=>{
+ for(const state of ['SUBMITTED_UNVERIFIED','INCLUDED_NOT_FINAL','UNKNOWN','NOT_FOUND','REVIEW_REQUIRED']){
+  assert.equal(describeManualProof(500,500,state).kind,'REVIEW_REQUIRED');
+ }
+});
+test('zero/negative/unsafe amount does not generate a payment claim',()=>{
+ for(const amount of [0,-1,0.5,NaN,Infinity,Number.MAX_SAFE_INTEGER+1]){
+  assert.equal(describeManualProof(amount,500,'FINAL_MATCHED').kind,'REVIEW_REQUIRED');
+ }
 });
