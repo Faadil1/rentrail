@@ -125,3 +125,19 @@ test('RPC uses pinned HTTPS endpoint, no credentials and read-only POST',async()
  assert.equal(request?.method,'POST');assert.equal(request?.credentials,'omit');assert.equal(request?.redirect,'error');
  const parsed=JSON.parse(String(request?.body));assert.deepEqual(parsed.params,[]);assert.equal(parsed.method,'isConsensusEstablished');
 });
+
+import { findIncomingRentPayments } from '../src/rpc.ts';
+test('incoming scan keeps only RR1-tagged transfers to the landlord address', async () => {
+  const to = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+  const hex = (s: string) => Buffer.from(s).toString('hex');
+  const memo = 'RR1:' + 'a'.repeat(32);
+  const rows = [
+    { hash: '1'.repeat(64), to, value: 125000, recipientData: hex(memo), executionResult: true },
+    { hash: '1'.repeat(64), to, value: 125000, recipientData: hex(memo), executionResult: true },
+    { hash: '2'.repeat(64), to, value: 5, recipientData: hex('hello'), executionResult: true },
+    { hash: '3'.repeat(64), to: 'NQ46 YCNN 4H64 DNDL GFDD VU50 YPJC MATF 7A3H', value: 5, recipientData: hex(memo) },
+    { hash: '4'.repeat(64), to, value: 7, recipientData: hex(memo), executionResult: false },
+  ];
+  const found = await findIncomingRentPayments(to, async (m, p) => { assert.equal(m, 'getTransactionsByAddress'); assert.equal(p[2], null); return rows; });
+  assert.deepEqual(found, [{ hash: '1'.repeat(64), memo, amountLuna: 125000 }]);
+});

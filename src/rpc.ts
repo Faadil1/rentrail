@@ -5,11 +5,11 @@ export const PUBLIC_RPC = 'https://rpc.nimiqwatch.com/';
 export const MAIN_ALBATROSS_NETWORK_ID = 24;
 export type ReadMethod =
   | 'isConsensusEstablished' | 'getLatestBlock' | 'getTransactionByHash'
-  | 'getBlockByNumber' | 'getMacroBlockAfter' | 'getTransactionsByBlockNumber';
+  | 'getBlockByNumber' | 'getMacroBlockAfter' | 'getTransactionsByBlockNumber' | 'getTransactionsByAddress';
 
 const allowedMethods = new Set<ReadMethod>([
   'isConsensusEstablished', 'getLatestBlock', 'getTransactionByHash',
-  'getBlockByNumber', 'getMacroBlockAfter', 'getTransactionsByBlockNumber',
+  'getBlockByNumber', 'getMacroBlockAfter', 'getTransactionsByBlockNumber', 'getTransactionsByAddress',
 ]);
 export type RpcReader = (method: ReadMethod, params: unknown[]) => Promise<unknown>;
 export interface VerifyInput {
@@ -187,4 +187,32 @@ export async function verifyNimTransaction(
   } catch(err) {
     return unverified('RPC verification failed: '+(err instanceof Error?err.message:'Unknown error')+'. No payment credit.');
   }
+}
+
+export interface IncomingCandidate { hash: string; memo: string; amountLuna: number }
+/**
+ * Lists recent incoming transfers to `address` that carry an RR1 rent reference.
+ * Candidates only: each one must still pass verifyNimTransaction() before it is credited.
+ */
+export async function findIncomingRentPayments(
+  address: string, rpc: RpcReader=createReadOnlyRpc(), max=200,
+): Promise<IncomingCandidate[]> {
+  if(!looksLikeNimiqAddress(address))throw Error('Invalid address.');
+  const list=await rpc('getTransactionsByAddress',[address,max,null]);
+  if(!Array.isArray(list))throw Error('Unexpected history response.');
+  const out:IncomingCandidate[]=[];
+  const seen=new Set<string>();
+  for(const v of list){
+    const tx=row(v);
+    if(!tx||!validHash(tx.hash)||seen.has(tx.hash.toLowerCase()))continue;
+    if(typeof tx.to!=='string'||normalizeAddress(tx.to)!==normalizeAddress(address))continue;
+    if(tx.executionResult===false)continue;
+    const memo=decodeRecipientData(tx.recipientData);
+    if(!memo||!/^RR1:[a-f0-9]{32}$/.test(memo))continue;
+    const amount=safeValue(tx.value);
+    if(amount===null)continue;
+    seen.add(tx.hash.toLowerCase());
+    out.push({hash:tx.hash.toLowerCase(),memo,amountLuna:amount});
+  }
+  return out;
 }

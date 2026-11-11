@@ -241,3 +241,5 @@ a.charge-row{color:inherit}
   .receipt footer p{font-size:10px;color:#444;line-height:1.5}
   .mobile-nav,.toast{display:none !important}
 }
+.sync-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;padding:10px 12px;border-radius:11px;background:#f3f7ff;border:1px solid #dbe8fa;font-size:11px;color:#4d6a96;font-weight:700}
+.sync-bar>span{display:flex;align-items:center;gap:8px}

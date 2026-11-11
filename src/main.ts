@@ -6,7 +6,7 @@ import { journeySteps,validAudience,parseManualPaymentReview,describeManualProof
 import { collectionQueue,collectionCsv,reminderDraft,validDueDay,type DueDays } from './collections.ts';
 import { isValidNimiqAddress, formatNimiqAddress } from './address-validation.ts';
 import { createPaymentAudit, decodePaymentAudit, auditUrl, type PublicPaymentAudit } from './audit.ts';
-import { verifyNimTransaction, type VerifyResult } from './rpc.ts';
+import { verifyNimTransaction, findIncomingRentPayments, type VerifyResult } from './rpc.ts';
 import { addProof, evidenceByCharge, parseProofs, removeProof, PROOF_STORAGE_KEY, type StoredProof } from './proof-store.ts';
 import { payableAmountIssue } from './amount-rules.ts';
 import { payRentRequest, payButtonLabel, PayError } from './payment.ts';
@@ -135,6 +135,9 @@ const LANDLORD_KEY='rentrail-landlord-v1';
 let landlordWallet:string|null=(()=>{try{const v=JSON.parse(localStorage.getItem(LANDLORD_KEY)||'{}')?.wallet;return typeof v==='string'&&isValidNimiqAddress(v)?formatNimiqAddress(v):null;}catch{return null;}})();
 function saveLandlordWallet(w:string|null):void{landlordWallet=w;try{localStorage.setItem(LANDLORD_KEY,JSON.stringify({wallet:w}));}catch{/* session only */}}
 let walletBusy=false;
+let syncBusy=false;
+let syncMessage='';
+let lastSyncAt:string|null=null;
 
 // Tenant wallet per unit, learned from the first payment proof the tenant signs.
 const UNIT_TENANTS_KEY='rentrail-unit-tenants-v1';
@@ -330,8 +333,13 @@ function periodCockpit(p:Portfolio):string {
       <div><small>Paid on-chain</small><strong>${snap.paidCount} / ${snap.charges}</strong></div>
     </div>
     <div class="period-lines">${monthlyLines||'<div class="empty-period">No rent requests for this month yet.</div>'}</div>
+    ${syncBar()}
     <div class="period-actions"><button class="tertiary" data-nav="charges" type="button">Manage this month ${icon('arrow')}</button></div>
   </section>`;
+}
+function syncBar():string{
+  if(preview)return '';
+  return `<div class="sync-bar" role="status"><span>${syncBusy?'<span class="spinner" aria-hidden="true"></span> Looking for rent payments on Nimiq mainnet…':escapeHtml(syncMessage||(lastSyncAt?'Up to date.':'Payments to your address are detected automatically.'))}</span><button id="sync-payments" class="tertiary" type="button" ${syncBusy||!portfolio.charges.length?'disabled':''}>Sync payments</button></div>`;
 }
 function renewalPlanner(p:Portfolio):string {
   const source=p.charges.filter(c=>c.period===workspaceMonth);
@@ -404,6 +412,7 @@ function collectionsView(p:Portfolio):string {
       <div><small>Late requests</small><strong>${report.overdueCount}</strong></div>
       <div><small>Paid on-chain</small><strong>${formatNim(report.observedNodeLuna)} NIM</strong></div>
     </div>
+    ${syncBar()}
     <button id="download-collections" type="button" class="tertiary" ${!report.lines.length?'disabled':''}>Export CSV</button>
   </section>
   <section class="panel"><div class="section-heading"><h2>Requests</h2><span class="count">${report.lines.length}</span></div>
@@ -703,6 +712,7 @@ function bindEvents():void {
   root!.querySelectorAll<HTMLButtonElement>('[data-sign]').forEach(b=>b.addEventListener('click',()=>void onSignCharges([b.dataset.sign||''])));
   root!.querySelector('#sign-all')?.addEventListener('click',()=>void onSignCharges(portfolio.charges.filter(c=>!c.sig).map(c=>c.id)));
   root!.querySelector('#connect-wallet')?.addEventListener('click',()=>void onConnectWallet());
+  root!.querySelector('#sync-payments')?.addEventListener('click',()=>void onSyncPayments());
   root!.querySelector('#disconnect-wallet')?.addEventListener('click',()=>{if(window.confirm('Use a different Nimiq Pay wallet? Existing requests keep their signatures.')){saveLandlordWallet(null);render();}});
   root!.querySelector<HTMLInputElement>('#ack-unsigned')?.addEventListener('change',e=>{unsignedAck=(e.target as HTMLInputElement).checked;render();});
   root!.querySelector<HTMLInputElement>('#ack-changed')?.addEventListener('change',e=>{changedAddressAck=(e.target as HTMLInputElement).checked;render();});
@@ -1072,3 +1082,33 @@ async function onPrintTenantReceipt():Promise<void>{
   }
   setTimeout(()=>window.print(),50);
 }
+
+/**
+ * Finds rent payments sent to this landlord's receiving addresses: lists recent incoming
+ * transfers carrying an RR1 reference, matches them to requests, and credits each one only
+ * after the full on-chain check (recipient, amount, reference, execution, finality).
+ */
+async function onSyncPayments(quiet=false):Promise<void>{
+  if(syncBusy||preview||!portfolio.charges.length)return;
+  syncBusy=true;if(!quiet)syncMessage='';render();
+  let found=0,partial=0,failed=false;
+  try{
+    const recipients=[...new Set(portfolio.charges.map(c=>c.recipient.replace(/\s+/g,'').toUpperCase()))].slice(0,10);
+    const known=new Set(storedProofs.map(p=>p.hash));
+    for(const address of recipients){
+      let candidates;
+      try{candidates=await findIncomingRentPayments(address);}catch{failed=true;continue;}
+      for(const c of candidates){
+        if(known.has(c.hash))continue;
+        const charge=portfolio.charges.find(x=>x.memo===c.memo&&x.recipient.replace(/\s+/g,'').toUpperCase()===address);
+        if(!charge)continue;
+        const result=await verifyNimTransaction({hash:c.hash,recipient:charge.recipient,memo:charge.memo,amountLuna:charge.amountLuna,allowPartial:true});
+        if(recordProof(charge.id,result)==='ADDED'){found++;known.add(c.hash);if((result.amountLuna??0)<charge.amountLuna)partial++;}
+      }
+    }
+    lastSyncAt=new Date().toISOString();
+    syncMessage=failed&&!found?'Could not reach Nimiq mainnet. Try again in a moment.':found?`${found} new payment${found===1?'':'s'} found and confirmed${partial?` (${partial} partial)`:''}.`:'Up to date: no new rent payments.';
+  }catch{syncMessage='Could not reach Nimiq mainnet. Try again in a moment.';}
+  finally{syncBusy=false;render();}
+}
+if(!tenantRequest&&!publicAudit&&!publicAuditError&&portfolio.charges.length)setTimeout(()=>void onSyncPayments(true),800);
