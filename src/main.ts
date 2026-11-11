@@ -840,7 +840,7 @@ async function onRecheckSavedHashes():Promise<void>{
         }else unresolved++;
       }catch{unresolved++;}
     }
-    recheckMessage=`+'`'+'Rechecked ${matched+unresolved} saved hash(es): ${matched} node-reported match(es), ${unresolved} unresolved. Partial and overpaid totals require review. This session result is not a legal rent receipt.'+'`'+`;
+    recheckMessage=`Rechecked ${matched+unresolved} saved hash(es): ${matched} node-reported match(es), ${unresolved} unresolved. Partial and overpaid totals require review. This session result is not a legal rent receipt.`;
   }finally{recheckBusy=false;render();}
 }
 async function onVerifyG3(form:HTMLFormElement):Promise<void>{
