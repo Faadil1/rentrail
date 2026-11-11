@@ -760,8 +760,8 @@ function tenantView(request:SharedRequest):string {
     <div class="slip-stub">
       <div class="stub-row"><span>Ticket no: ${escapeHtml(request.memo.slice(6,12).toUpperCase())}${escapeHtml(m)}</span>${addressOk?identiconImg(request.recipient,26):''}</div>
       <div class="pay-zone">${tenantPaySection(request)}</div>
-      ${paid?`<div class="stamp" aria-label="Paid">PAID<small>${escapeHtml(new Date().toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'}).toUpperCase())}</small></div>`:''}
     </div>
+    ${paid?`<div class="stamp" aria-label="Paid">PAID<small>${escapeHtml(new Date().toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'}).toUpperCase())}</small></div>`:''}
     <footer class="slip-sign">${trust.level==='signed'&&sig?`${signatureScribble(sig.signature)}<span class="sig-label">Signed by landlord</span><small>Nimiq wallet signature · verified</small>`:trust.level==='unsigned'?'<span class="sig-label warn">Not signed by landlord</span><small>Confirm the address with your landlord.</small>':'<span class="sig-label bad">Link modified</span><small>Do not pay. Ask for a new link.</small>'}</footer>
   </article>
   ${strip?`<div class="sheet-rail reveal">${strip}</div>`:''}

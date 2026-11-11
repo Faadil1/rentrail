@@ -686,3 +686,8 @@ button:disabled{opacity:.4}
 .landing-art .stamp.small{color:var(--orange);border-color:var(--orange)}
 @media(max-width:768px){.ledger-page{padding:14px 26px 12px 10px}.ledger th,.ledger td{padding:7px 4px}.l-tenant .mono{display:none}.months li{font-size:15px;gap:4px}.months li b{width:16px;height:16px}}
 .slip-sign{padding-top:6px}.scribble{margin:0 10px -6px 0}
+.pay-success{border:1.5px solid var(--blue);border-radius:4px;background:transparent}
+.pay-success-icon{background:var(--blue);color:var(--paper)}
+.pay-success strong{font-family:'Archivo Variable';font-stretch:72%;font-weight:900;font-size:24px}
+.pay-success p{font-family:'Courier Prime',monospace;color:var(--ink)}
+.rent-slip .stamp{top:150px;bottom:auto;right:14px;width:120px;height:120px;font-size:36px;z-index:3}
