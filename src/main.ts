@@ -534,7 +534,15 @@ function render():void {
   bindEvents();
 }
 function success(message:string):void { toast=message; render(); setTimeout(()=>{ toast='';render(); },4600); }
-function error(message:string):void { toast=`Notice: ${message}`;render(); }
+// Errors must not re-render: the user's form input stays in place so they can fix it.
+function error(message:string):void {
+  toast=message;
+  const main=root!.querySelector('.main-content');
+  let el=root!.querySelector<HTMLElement>('.toast');
+  if(!el&&main){el=document.createElement('div');el.className='toast';el.setAttribute('role','status');main.appendChild(el);}
+  if(el){el.textContent=message;el.classList.add('toast-error');}
+  setTimeout(()=>{if(toast===message){toast='';root!.querySelector('.toast')?.remove();}},6000);
+}
 function formValue(form:HTMLFormElement,key:string):string { return String(new FormData(form).get(key)||'').trim(); }
 function bindEvents():void {
   root!.querySelectorAll<HTMLButtonElement>('[data-audience]').forEach(button=>button.addEventListener('click',()=>{
