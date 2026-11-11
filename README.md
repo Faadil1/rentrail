@@ -5,6 +5,19 @@ RentRail is a **Nimiq Pay Mini App** for tenant/landlord payment coordination. P
 
 > **Cycle III / PAY submission candidate · MIT License · Mainnet-aware.** This repository contains a working **rent ledger + mainnet verification** app, not a licensed rent collector or a guarantee that rent is legally discharged.
 
+## Cycle III — latest complete P0–P3 development preview (not merged)
+
+**Try it without funds:** https://rentrail-operations-staging-ja0pr6axo-faadil1s-projects.vercel.app/  
+**Validated app commit:** `56303591d644555763872417bb03dfc7fddb55bf` — Vercel preview READY, **277/277 automated tests passed**, TypeScript and Vite passed. The iPhone Nimiq Pay WebView acceptance remains pending; this is not proof of official Cycle III submission.
+
+**For a landlord:** create properties and rent requests; review monthly due dates; verify past mainnet transfers and optionally save up to eight public hashes for future read-only rechecks. A separate manual local-currency illustration can explain the approximate NIM equivalent, **not a quoted or locked exchange rate**.
+
+**For a tenant:** open a shared rent request, compare the receiving address with one provided through an independent trusted channel, and check already-sent transfers on a public Nimiq node. A matching checksum/address **does not authenticate a landlord**. Unsigned shared links remain editable.
+
+**For the jury:** choose **Show me RentRail** for explicitly fictional data and the monthly review story. No live funds, authenticated tenancy, server-side synchronization, real-user adoption claim or legal payment receipt is represented by this preview.
+
+Development PRs: [#19 clarity](https://github.com/Faadil1/rentrail/pull/19) → [#20 recipient cross-check](https://github.com/Faadil1/rentrail/pull/20) → [#21 saved-hash recheck](https://github.com/Faadil1/rentrail/pull/21) → [#22 manual fiat context](https://github.com/Faadil1/rentrail/pull/22). They are **drafts**, stacked on earlier [#18 guided journey](https://github.com/Faadil1/rentrail/pull/18) and [#17 Collections](https://github.com/Faadil1/rentrail/pull/17), and have not been merged to main. See [P0–P3 gate ledger](docs/P0_P3_DELIVERY_GATES.md) and [Cycle III submission text](docs/CYCLE3_SUBMISSION_CLARITY_PACK.md).
+
 ## Understand RentRail in 30 seconds
 
 **The problem:** A wallet transaction only says that NIM moved. A landlord and tenant also need to know **which rental unit, which month, whether the payment matches the amount requested, and what remains for review**.
