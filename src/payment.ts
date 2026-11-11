@@ -1,6 +1,7 @@
 import { init, getHostNetwork, NimiqProviderError } from '@nimiq/mini-app-sdk';
 import { isValidNimiqAddress } from './address-validation.ts';
 import { formatNim, validateSharedRequest, type SharedRequest } from './domain.ts';
+import { signedPaymentIntegrityError } from './payment-integrity.ts';
 
 export { MIN_PAYABLE_LUNA, payableAmountIssue } from './amount-rules.ts';
 import { payableAmountIssue } from './amount-rules.ts';
@@ -19,6 +20,8 @@ export async function payRentRequest(raw: SharedRequest): Promise<string> {
   let request: SharedRequest;
   try { request = validateSharedRequest(raw); } catch (e) { throw new PayError('INVALID_REQUEST', e instanceof Error ? e.message : 'Invalid request.'); }
   if (!isValidNimiqAddress(request.recipient)) throw new PayError('INVALID_REQUEST', 'The receiving address checksum is invalid. Nothing was sent.');
+  const integrityError = signedPaymentIntegrityError(request);
+  if (integrityError) throw new PayError('INVALID_REQUEST', integrityError);
   const amountIssue = payableAmountIssue(request.amountLuna);
   if (amountIssue) throw new PayError('INVALID_REQUEST', amountIssue);
 
