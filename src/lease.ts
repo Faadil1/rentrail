@@ -71,7 +71,8 @@ export function requestMatchesLease(r: SharedRequest): boolean {
   try {
     const expected = leaseRequest(r.lease, r.period);
     return expected.chargeId === r.chargeId && expected.memo === r.memo &&
-      normalizeAddress(expected.recipient) === normalizeAddress(r.recipient) && expected.amountLuna === r.amountLuna;
+      normalizeAddress(expected.recipient) === normalizeAddress(r.recipient) && expected.amountLuna === r.amountLuna &&
+      expected.title === r.title;
   } catch { return false; }
 }
 
