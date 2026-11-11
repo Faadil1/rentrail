@@ -9,8 +9,8 @@ function fixture():Portfolio{
  p=addProperty(p,{id:prop,name:'Harbour House',createdAt:'2026-10-01T00:00:00Z'});
  p=addUnit(p,{id:a,propertyId:prop,label:'A-1'});
  p=addUnit(p,{id:b,propertyId:prop,label:'B-2'});
- p=addCharge(p,{id:c,unitId:a,period:'2026-10',amountLuna:250_000,recipient:receiver,memo:'RR1:'+c,createdAt:'2026-10-01T00:00:00Z'});
- p=addCharge(p,{id:d,unitId:b,period:'2026-11',amountLuna:200_000,recipient:receiver,memo:'RR1:'+d,createdAt:'2026-10-01T00:00:00Z'});
+ p=addCharge(p,{id:c,unitId:a,period:'2026-10',amountLuna:250_000,recipient:receiver,memo:'STUB1:'+c,createdAt:'2026-10-01T00:00:00Z'});
+ p=addCharge(p,{id:d,unitId:b,period:'2026-11',amountLuna:200_000,recipient:receiver,memo:'STUB1:'+d,createdAt:'2026-10-01T00:00:00Z'});
  return p;
 }
 test('default due date is first of month',()=>assert.equal(dueDateFor('2026-11'),'2026-11-01'));
@@ -61,12 +61,12 @@ test('invalid saved due rules fail closed',()=>assert.throws(()=>collectionQueue
 test('local CSV export includes correct headers and no wallet NQ address',()=>{
  const csv=collectionCsv(collectionQueue(fixture(),'2026-11-10'));
  assert.match(csv,/local_status/);assert.match(csv,/Harbour House/);
- assert.equal(csv.includes(receiver),false);assert.equal(csv.includes('RR1:'),false);
+ assert.equal(csv.includes(receiver),false);assert.equal(csv.includes('STUB1:'),false);
 });
 test('CSV neutralizes spreadsheet formulas in names',()=>{
  let p=emptyPortfolio();p=addProperty(p,{id:prop,name:'=HYPERLINK("bad")',createdAt:'2026-10-01T00:00:00Z'});
  p=addUnit(p,{id:a,propertyId:prop,label:'@SUM(2,2)'});
- p=addCharge(p,{id:c,unitId:a,period:'2026-11',amountLuna:250,recipient:receiver,memo:'RR1:'+c,createdAt:'2026-10-01T00:00:00Z'});
+ p=addCharge(p,{id:c,unitId:a,period:'2026-11',amountLuna:250,recipient:receiver,memo:'STUB1:'+c,createdAt:'2026-10-01T00:00:00Z'});
  const csv=collectionCsv(collectionQueue(p,'2026-11-10'));
  assert.match(csv,/"'=HYPERLINK/);assert.match(csv,/"'@SUM/);
 });
@@ -76,7 +76,7 @@ test('empty portfolio has zero metrics, no fabricated payments',()=>{
 });
 
 function proof(amountLuna:number,hash='f'.repeat(64)):TransferEvidence{
- return {network:'nimiq-mainnet',hash,recipient:receiver,memo:'RR1:'+c,amountLuna,status:'FINAL_VERIFIED'};
+ return {network:'nimiq-mainnet',hash,recipient:receiver,memo:'STUB1:'+c,amountLuna,status:'FINAL_VERIFIED'};
 }
 test('one node-reported exact match reduces session-only outstanding, never local persistent charge',()=>{
  const p=fixture();
@@ -92,7 +92,7 @@ test('one node-reported partial match leaves due remainder and requests human fo
  assert.equal(q.outstandingLuna,350_000);
 });
 test('wrong memo never silently credits rent even if hash is final',()=>{
- const fake={...proof(250_000),memo:'RR1:'+'e'.repeat(32)};
+ const fake={...proof(250_000),memo:'STUB1:'+'e'.repeat(32)};
  const q=collectionQueue(fixture(),'2026-11-10',{},'',{[c]:[fake]});
  assert.equal(q.lines[0].state,'NODE_REVIEW_REQUIRED');
  assert.equal(q.observedNodeLuna,0);assert.equal(q.outstandingLuna,450_000);

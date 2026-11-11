@@ -36,7 +36,7 @@ test('sign results in hex, base64 or byte arrays are normalized', () => {
 });
 
 test('the signed request text binds address, amount, month and reference', () => {
-  const m = rentRequestMessage({ recipient: V.addr, amountLuna: 125_000, period: '2026-11', memo: 'RR1:' + 'a'.repeat(32) });
+  const m = rentRequestMessage({ recipient: V.addr, amountLuna: 125_000, period: '2026-11', memo: 'STUB1:' + 'a'.repeat(32) });
   assert.match(m, /Pay to: NQ46YCNN4H64DNDLGFDDVU50YPJCMATF7A3H/);
   assert.match(m, /Amount: 1.25 NIM \(125000 Luna\)/);
   assert.match(m, /Month: 2026-11/);

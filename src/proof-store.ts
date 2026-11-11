@@ -3,7 +3,7 @@ import type { TransferEvidence } from './domain.ts';
 /**
  * Persisted on-chain payment proofs for this device's ledger.
  * Each proof was matched by the public mainnet history node (recipient, amount,
- * RR1 reference, execution, finality) before being stored. A hash can only
+ * STUB1 reference, execution, finality) before being stored. A hash can only
  * ever count once, across all charges.
  */
 export interface StoredProof {

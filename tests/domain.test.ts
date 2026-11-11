@@ -85,7 +85,7 @@ test('wrong recipient does not credit rent',()=>{
   assert.equal(v.status,'REVIEW_REQUIRED');assert.equal(v.creditedLuna,0);
 });
 test('wrong period reference does not credit rent',()=>{
-  const v=projectCharge(charge(),[transfer({memo:'RR1:'+'b'.repeat(32)})]);
+  const v=projectCharge(charge(),[transfer({memo:'STUB1:'+'b'.repeat(32)})]);
   assert.equal(v.status,'REVIEW_REQUIRED');assert.equal(v.creditedLuna,0);
 });
 test('included but not final does not credit rent',()=>{
@@ -112,6 +112,6 @@ test('shared link roundtrip is structurally valid',()=>{
   const v=validateSharedRequest(shareableRequest(charge()));
   assert.equal(v.memo,memo);assert.equal(v.amountLuna,250_000);
 });
-test('shared request cannot mismatch memo and charge id',()=>assert.throws(()=>validateSharedRequest({...shareableRequest(charge()),memo:'RR1:'+'a'.repeat(32)})));
+test('shared request cannot mismatch memo and charge id',()=>assert.throws(()=>validateSharedRequest({...shareableRequest(charge()),memo:'STUB1:'+'a'.repeat(32)})));
 test('shared request cannot include invalid amount',()=>assert.throws(()=>validateSharedRequest({...shareableRequest(charge()),amountLuna:0})));
 test('shared request cannot target non NQ recipient',()=>assert.throws(()=>validateSharedRequest({...shareableRequest(charge()),recipient:'0xabcdef'})));

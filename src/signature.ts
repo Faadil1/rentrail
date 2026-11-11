@@ -46,11 +46,11 @@ export function addressFromPublicKey(publicKey: Uint8Array): string {
 export function rentRequestMessage(r: { recipient: string; amountLuna: number; period: string; memo: string; title?: string }): string {
   const nim = (r.amountLuna / 100_000).toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
   const title = r.title ? `\nFor: ${asciiJson(r.title)}` : '';
-  return `RentRail rent request${title}\nPay to: ${compactNimiqAddress(r.recipient)}\nAmount: ${nim} NIM (${r.amountLuna} Luna)\nMonth: ${r.period}\nReference: ${r.memo}`;
+  return `Stub rent request${title}\nPay to: ${compactNimiqAddress(r.recipient)}\nAmount: ${nim} NIM (${r.amountLuna} Luna)\nMonth: ${r.period}\nReference: ${r.memo}`;
 }
 /** The text a tenant signs to claim a payment as theirs. ASCII only. */
 export function paymentClaimMessage(memo: string, txHash: string): string {
-  return `RentRail payment\nReference: ${memo}\nTransaction: ${txHash.toLowerCase()}`;
+  return `Stub payment\nReference: ${memo}\nTransaction: ${txHash.toLowerCase()}`;
 }
 
 export interface SignedBy { publicKey: string; signature: string }

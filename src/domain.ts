@@ -65,6 +65,8 @@ export interface SharedRequest {
   chargeId: string;
   title?: string;
   sig?: Signed;
+  /** Present when this month comes from a signed monthly lease (see lease.ts). */
+  lease?: import('./lease.ts').Lease;
 }
 const HEX = (n: number) => new RegExp(`^[0-9a-f]{${n}}$`);
 export function validTitle(v: unknown): v is string {
@@ -119,7 +121,7 @@ export function createId(randomBytes: Uint8Array): string {
 }
 export function makeMemo(id: string): string {
   if (!/^[0-9a-f]{32}$/.test(id)) throw new Error('Invalid opaque request ID.');
-  const memo = `RR1:${id}`;
+  const memo = `STUB1:${id}`;
   if (new TextEncoder().encode(memo).length > 64) throw new Error('Public memo exceeds 64 bytes.');
   return memo;
 }
@@ -137,7 +139,7 @@ export function addCharge(p: Portfolio, charge: Charge): Portfolio {
   if (!p.units.some(x => x.id === charge.unitId)) throw new Error('Unknown unit.');
   if (!isSafeLuna(charge.amountLuna)) throw new Error('Invalid amount.');
   if (!looksLikeNimiqAddress(charge.recipient)) throw new Error('Invalid Nimiq address structure.');
-  if (!/^RR1:[0-9a-f]{32}$/.test(charge.memo)) throw new Error('Memo must be an opaque request reference.');
+  if (!/^STUB1:[0-9a-f]{32}$/.test(charge.memo)) throw new Error('Memo must be an opaque request reference.');
   if (p.charges.some(x => x.id === charge.id || x.memo === charge.memo)) throw new Error('Duplicate charge or public reference.');
   if (p.charges.some(x => x.unitId === charge.unitId && x.period === charge.period)) {
     throw new Error('An obligation for this unit and period already exists.');
@@ -197,6 +199,7 @@ export function validateSharedRequest(raw: unknown): SharedRequest {
   const out: SharedRequest = { v: 1, chargeId: x.chargeId, memo: x.memo, recipient: normalizeAddress(x.recipient), amountLuna: x.amountLuna, period: x.period };
   if (x.title !== undefined) { if (!validTitle(x.title)) throw new Error('Invalid request title.'); out.title = x.title; }
   if (x.sig !== undefined) { if (!validSigned(x.sig)) throw new Error('Invalid signature format.'); out.sig = { publicKey: x.sig.publicKey, signature: x.sig.signature }; }
+  if (x.lease !== undefined) out.lease = leaseValidator(x.lease);
   return out;
 }
 /** Attaches (or replaces) the landlord signature on an existing request. */
@@ -205,3 +208,7 @@ export function setChargeSignature(p: Portfolio, chargeId: string, sig: Signed):
   if (!p.charges.some(c => c.id === chargeId)) throw new Error('Unknown charge.');
   return { ...p, charges: p.charges.map(c => c.id === chargeId ? { ...c, sig } : c) };
 }
+
+// Set by lease.ts to avoid a circular import at module load.
+let leaseValidator: (raw: unknown) => import('./lease.ts').Lease = () => { throw new Error('Leases are not supported here.'); };
+export function registerLeaseValidator(fn: typeof leaseValidator): void { leaseValidator = fn; }

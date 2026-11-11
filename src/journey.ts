@@ -24,14 +24,14 @@ export function validAudience(x:unknown):x is Audience{
 export function journeySteps(audience:Audience,p:Portfolio,hasNodeMatch=false):JourneyStep[]{
   if(audience==='owner')return [
     {title:'Add your building and units',description:'One building or a whole portfolio. Labels stay on this device.',action:'view',view:'properties',label:'Add property',state:p.units.length?'LOCAL_DONE':'READY'},
-    {title:'Create this month\'s rent request',description:'Pick the unit, month, amount in NIM and your receiving address. Each request gets a unique RR1 reference.',action:'view',view:'charges',label:'Create request',state:p.charges.length?'LOCAL_DONE':'READY'},
+    {title:'Create this month\'s rent request',description:'Pick the unit, month, amount in NIM and your receiving address. Each request gets a unique STUB1 reference.',action:'view',view:'charges',label:'Create request',state:p.charges.length?'LOCAL_DONE':'READY'},
     {title:'Send the link to your tenant',description:'Your tenant opens it in Nimiq Pay and pays in one tap. No account needed.',action:'view',view:'charges',label:'Share a request',state:'READY'},
     {title:'See who has paid',description:'Payments are confirmed on Nimiq mainnet and your ledger updates: paid, partly paid or still due.',action:'view',view:'collections',label:'Review this month',state:hasNodeMatch?'LOCAL_DONE':'READY'},
   ];
   if(audience==='tenant')return [
     {title:'Open the link from your landlord',description:'It shows the month, the amount and who receives the rent.',action:'instructions',label:'How it works',state:'GUIDANCE_ONLY'},
-    {title:'Pay with Nimiq Pay',description:'Approve the payment in your Nimiq Pay wallet. RentRail never holds your funds or keys.',action:'instructions',label:'Payment safety',state:'GUIDANCE_ONLY'},
-    {title:'Get your on-chain proof',description:'RentRail confirms the transfer on Nimiq mainnet and gives you a proof link to send to your landlord.',action:'view',view:'wallet',label:'Check a payment',state:'READY'},
+    {title:'Pay with Nimiq Pay',description:'Approve the payment in your Nimiq Pay wallet. Stub never holds your funds or keys.',action:'instructions',label:'Payment safety',state:'GUIDANCE_ONLY'},
+    {title:'Get your on-chain proof',description:'Stub confirms the transfer on Nimiq mainnet and gives you a proof link to send to your landlord.',action:'view',view:'wallet',label:'Check a payment',state:'READY'},
   ];
   return [
     {title:'Explore a sample portfolio',description:'Two buildings, three units, one rent already paid on-chain. Nothing is sent.',action:'preview',label:'Open sample',state:'READY'},
@@ -52,14 +52,14 @@ export function parseManualPaymentReview(fields:ManualPaymentReviewFields):Verif
   if(!/^[a-f0-9]{64}$/.test(hash))throw Error('Paste a transaction hash of exactly 64 hexadecimal characters.');
   if(!isValidNimiqAddress(fields.recipient))throw Error('The recipient is not a valid Nimiq NQ address. Check the checksum.');
   const memo=fields.memo.trim();
-  if(!/^RR1:[a-f0-9]{32}$/.test(memo))throw Error('Enter the exact RR1: reference from the rent request.');
+  if(!/^STUB1:[a-f0-9]{32}$/.test(memo))throw Error('Enter the exact STUB1: reference from the rent request.');
   const amountLuna=parseNim(fields.amountNim);
   return {hash,recipient:formatNimiqAddress(fields.recipient),memo,amountLuna,allowPartial:true};
 }
 
 export const statusExplanations=[
   {title:'Awaiting payment',description:'The request exists for this unit and month. Nothing has been paid yet.'},
-  {title:'Payment sent',description:'The tenant approved the payment in Nimiq Pay. RentRail is waiting for the network to confirm it.'},
+  {title:'Payment sent',description:'The tenant approved the payment in Nimiq Pay. Stub is waiting for the network to confirm it.'},
   {title:'Paid ✓ confirmed on-chain',description:'Nimiq mainnet shows the exact amount, to the right address, with this month\'s reference, finalized.'},
   {title:'Needs review',description:'Partly paid, overpaid or not matching the request. Check it with your tenant.'},
 ] as const;
