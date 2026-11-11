@@ -429,7 +429,7 @@ function chargeRow(p:Portfolio,c:Charge,evidence:Record<string,TransferEvidence[
 function propertiesView(p:Portfolio):string {
   const cards=p.properties.map(property=>{
     const units=p.units.filter(u=>u.propertyId===property.id);
-    return `<div class="property-card"><div class="property-head"><span class="property-icon">${icon('building')}</span><div><strong>${normalizeLabel(property.name)}</strong><span>${units.length} unit${units.length===1?'':'s'}</span></div></div><div class="property-units">${units.map(u=>`<span class="unit-pill">${normalizeLabel(u.label)}${unitTenants[u.id]?` · <span class="mono" title="Tenant wallet, learned from a signed payment proof">${escapeHtml(shortAddress(unitTenants[u.id]))}</span> <button type="button" class="pill-x" data-forget-tenant="${escapeHtml(u.id)}" aria-label="Forget tenant wallet">×</button>`:''}</span>`).join('')||'<span class="hint">No units yet</span>'}</div></div>`;
+    return `<div class="property-card"><div class="property-head"><span class="property-icon">${icon('building')}</span><div><strong>${normalizeLabel(property.name)}</strong><span>${units.length} unit${units.length===1?'':'s'}</span></div></div><div class="property-units">${units.map(u=>`<span class="unit-pill">${normalizeLabel(u.label)}${unitTenants[u.id]?` · <span class="mono" title="Previously associated claim signer; on-chain sender not verified">${escapeHtml(shortAddress(unitTenants[u.id]))}</span> <button type="button" class="pill-x" data-forget-tenant="${escapeHtml(u.id)}" aria-label="Forget tenant wallet">×</button>`:''}</span>`).join('')||'<span class="hint">No units yet</span>'}</div></div>`;
   }).join('');
   return `<div class="page-title"><div><div class="eyebrow">PORTFOLIO</div><h1>Properties <em>& units.</em></h1><p>One building or an entire portfolio, the same rent ledger.</p></div></div>
   <div class="two-col"><div class="stack"><section class="panel"><h3>Add property</h3><form id="property-form" class="form-stack"><label>Property name<input name="name" maxlength="70" placeholder="e.g. Parkside building" required /></label><button class="primary" ${preview?'disabled':''} type="submit">${icon('plus')} Add property</button></form></section>
@@ -589,7 +589,7 @@ function tenantPaySection(request:SharedRequest):string{
   if(payState==='confirmed'&&paidHash)return `<div class="pay-success" role="status"><div class="pay-success-icon">${icon('check')}</div><strong>Paid ✓ confirmed on-chain</strong><p>${formatNim(request.amountLuna)} NIM for ${escapeHtml(request.period)} reached the landlord's address with this month's reference, finalized on Nimiq mainnet.</p>
     <button id="tenant-share-proof" class="primary full" type="button" ${shareBusy?'disabled':''}>${icon('link')} ${shareBusy?'Signing…':'Send signed proof to my landlord'}</button>
     <button id="tenant-receipt" class="tertiary full" type="button">${icon('receipt')} Receipt (PDF)</button>
-    <small>Your wallet signs the proof so your landlord knows the payment came from you.</small>
+    <small>Your wallet signs a claim about this payment; this does not prove which address sent the NIM on-chain.</small>
     <small class="mono">Tx ${escapeHtml(paidHash.slice(0,16))}…</small></div>`;
   if(payState==='sent'&&paidHash)return `<div class="pay-progress" role="status">
     <div class="pay-step done">${icon('check')}<span>Approved in Nimiq Pay</span></div>
@@ -656,13 +656,13 @@ function tenantEvidencePanel(request: SharedRequest): string {
   </details>`;
 }
 function payerInfo(audit:PublicPaymentAudit):{address:string|null;note:string;level:'ok'|'warn'|'none'}{
-  if(!audit.payer)return {address:null,note:'Payer not identified: this proof was not signed by the tenant\'s wallet.',level:'none'};
+  if(!audit.payer)return {address:null,note:'No signed wallet claim attached. The on-chain sender is not identified by this proof.',level:'none'};
   const check=verifySignedMessage(paymentClaimMessage(audit.request.memo,audit.txHash),audit.payer);
   if(!check.valid)return {address:null,note:'The payer signature is invalid and was ignored.',level:'warn'};
   const charge=portfolio.charges.find(c=>c.id===audit.request.chargeId);
   const bound=charge?unitTenants[charge.unitId]:undefined;
-  if(bound&&!sameAddress(bound,check.signer))return {address:check.signer,note:'Paid and signed by a different wallet than this unit\'s usual tenant.',level:'warn'};
-  return {address:check.signer,note:bound?'Paid by your tenant\'s wallet ✓':'Signed by the payer\'s Nimiq Pay wallet.',level:'ok'};
+  if(bound&&!sameAddress(bound,check.signer))return {address:check.signer,note:'Claim signed by a different wallet than the one previously associated with this unit. The on-chain sender remains unverified.',level:'warn'};
+  return {address:check.signer,note:'This wallet signed a statement claiming the public transaction. That signature does not prove the wallet sent the NIM.',level:'warn'};
 }
 function independentAuditView(audit:PublicPaymentAudit):string {
   const r=audit.request;
@@ -675,7 +675,7 @@ function independentAuditView(audit:PublicPaymentAudit):string {
     <div class="checkout-value">${formatNim(r.amountLuna)} <span>NIM</span></div>
     <div class="hr"></div>
     <div class="detail"><span>Paid to</span><strong class="mono">${escapeHtml(isValidNimiqAddress(r.recipient)?formatNimiqAddress(r.recipient):r.recipient)}</strong></div>
-    <div class="detail"><span>Paid by</span><strong class="mono">${payer.address?escapeHtml(formatNimiqAddress(payer.address)):'Unknown'}</strong></div>
+    <div class="detail"><span>Claim signed by</span><strong class="mono">${payer.address?escapeHtml(formatNimiqAddress(payer.address)):'Unknown'}</strong></div>
     <div class="trust-line ${payer.level==='ok'?'ok':payer.level==='warn'?'bad':''}">${escapeHtml(payer.note)}</div>
     <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(r.memo.slice(0,14))}…</strong></div>
     <div class="detail"><span>Transaction</span><strong class="mono">${escapeHtml(audit.txHash.slice(0,16))}…</strong></div>
@@ -700,7 +700,7 @@ function receiptMarkup(audit:PublicPaymentAudit,result:VerifyResult|null):string
       <div><dt>Amount</dt><dd>${typeof result.amountLuna==='number'?formatNim(result.amountLuna):formatNim(r.amountLuna)} NIM</dd></div>
       <div><dt>Month</dt><dd>${escapeHtml(r.period)}</dd></div>
       <div><dt>Paid to</dt><dd class="mono">${escapeHtml(isValidNimiqAddress(r.recipient)?formatNimiqAddress(r.recipient):r.recipient)}</dd></div>
-      <div><dt>Paid by</dt><dd class="mono">${payer.address?escapeHtml(formatNimiqAddress(payer.address)):'Not identified'}</dd></div>
+      <div><dt>Claim signed by</dt><dd class="mono">${payer.address?escapeHtml(formatNimiqAddress(payer.address)):'Not identified'}</dd></div>
       <div><dt>Reference</dt><dd class="mono">${escapeHtml(r.memo)}</dd></div>
       <div><dt>Transaction</dt><dd class="mono">${escapeHtml(audit.txHash)}</dd></div>
       <div><dt>Block</dt><dd>${result.blockHeight??'-'} (final at macro block ${result.macroHeight??'-'})</dd></div>
@@ -975,11 +975,9 @@ async function onAuditRecheck():Promise<void>{
       amountLuna:publicAudit.request.amountLuna,allowPartial:true});
     const charge=portfolio.charges.find(c=>c.id===publicAudit!.request.chargeId&&c.memo===publicAudit!.request.memo&&c.recipient===publicAudit!.request.recipient&&c.amountLuna===publicAudit!.request.amountLuna);
     if(charge){
-      const payer=payerInfo(publicAudit);
-      const outcome=recordProof(charge.id,publicAuditResult,payer.address??undefined);
-      if(payer.address&&!unitTenants[charge.unitId]&&(outcome==='ADDED'||outcome==='ALREADY_RECORDED')){
-        try{saveUnitTenants({...unitTenants,[charge.unitId]:formatNimiqAddress(payer.address)});}catch{/* binding is optional */}
-      }
+      // The claim signer is NOT independently proven to be the blockchain sender.
+      // Do not learn a tenant wallet identity from a signature over a public hash.
+      const outcome=recordProof(charge.id,publicAuditResult);
       if(outcome==='ADDED')publicAuditRecorded='Recorded in your ledger: this rent request is now marked paid.';
       else if(outcome==='ALREADY_RECORDED')publicAuditRecorded='Already recorded in your ledger.';
       else if(outcome==='USED_BY_OTHER_CHARGE')publicAuditRecorded='This transaction is already credited to another rent request in your ledger. Not counted twice.';
