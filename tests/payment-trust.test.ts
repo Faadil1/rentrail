@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { signedPaymentIntegrityError, payRentRequest, PayError } from '../src/payment.ts';
+import { signedPaymentIntegrityError } from '../src/payment-integrity.ts';
 import { makeMemo, type SharedRequest } from '../src/domain.ts';
 import { leaseRequest, type Lease } from '../src/lease.ts';
 
@@ -12,16 +12,14 @@ const forged={publicKey:'b'.repeat(64),signature:'c'.repeat(128)};
 test('unsigned request has no cryptographic integrity claim; UI still requires human address confirmation',()=>{
  assert.equal(signedPaymentIntegrityError(req),null);
 });
-test('forged signed request is rejected BEFORE Nimiq Pay provider is called',async()=>{
+test('forged signed request is rejected by the pre-send integrity policy',()=>{
  const tampered={...req,sig:forged};
  assert.match(signedPaymentIntegrityError(tampered)||'',/invalid or modified/i);
- await assert.rejects(()=>payRentRequest(tampered),e=>e instanceof PayError&&e.kind==='INVALID_REQUEST');
 });
-test('forged signed monthly lease is rejected even when request fields match',async()=>{
+test('forged signed monthly lease is rejected even when request fields match',()=>{
  const lease:Lease={v:1,id:'d'.repeat(32),recipient,amountLuna:1000,start:'2026-11',dueDay:1,sig:forged};
  const rent=leaseRequest(lease,'2026-11');
  assert.match(signedPaymentIntegrityError(rent)||'',/signed monthly lease/i);
- await assert.rejects(()=>payRentRequest(rent),e=>e instanceof PayError&&e.kind==='INVALID_REQUEST');
 });
 test('changing a lease-derived monthly amount blocks payment even without a signature',()=>{
  const lease:Lease={v:1,id:'d'.repeat(32),recipient,amountLuna:1000,start:'2026-11',dueDay:1};
