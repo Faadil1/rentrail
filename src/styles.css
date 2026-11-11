@@ -152,3 +152,15 @@
 @media(max-width:860px){.journey-pill{display:none}.status-guide-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.journey-step{grid-template-columns:31px minmax(0,1fr)}.journey-step-action{grid-column:2;justify-self:start}}
 @media(max-width:520px){.journey-shell{padding:15px;margin:12px 0 17px;border-radius:15px}.journey-audiences{grid-template-columns:1fr;gap:7px}.journey-audience{min-height:auto;padding:10px 12px}.journey-audience span{font-size:11px}.journey-steps{gap:8px}.journey-step{gap:9px;padding:10px;grid-template-columns:27px minmax(0,1fr)}.journey-number{width:27px;height:27px}.status-guide-grid{grid-template-columns:1fr 1fr;gap:8px}.status-stage{padding:11px;min-height:150px}.standalone-verify h2{font-size:21px}}
 @media(prefers-reduced-motion:reduce){.journey-audience{transition:none}}
+
+/* Tenant-facing request clarity. Historical transaction test controls stay collapsed. */
+.tenant-readonly-steps{margin-top:20px;border:1px solid #d6e6fa;background:linear-gradient(160deg,#f5f9ff,#fff);border-radius:15px;padding:19px}
+.tenant-readonly-steps h2{font-size:19px;margin:0 0 15px;color:#173b65}
+.tenant-readonly-list{display:grid;gap:11px}
+.tenant-readonly-list>div{padding:12px 14px;border-radius:11px;background:#fff;border:1px solid #e2eaf7}
+.tenant-readonly-list b{font-size:12.5px;color:#254a73}.tenant-readonly-list p{font-size:12px;line-height:1.6;margin:5px 0 0;color:#61768f}
+.tenant-technical{margin-top:16px;border-radius:11px;border:1px solid #d8e3f3;padding:11px 14px;background:#f7faff}
+.tenant-technical>summary{cursor:pointer;font-size:12px;color:#28507b;font-weight:750;padding:5px 0}
+.tenant-technical[open]>summary{margin-bottom:14px}
+.tenant-technical .smoke-panel{margin:0}
+@media(max-width:580px){.tenant-readonly-steps{padding:13px}.tenant-readonly-list>div{padding:11px}}
