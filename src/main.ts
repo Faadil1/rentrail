@@ -24,8 +24,8 @@ import { verifySignedMessage, rentRequestMessage, paymentClaimMessage, sameAddre
 import { TENANT_KEY, emptyTenantMemory, entryFor, parseTenantMemory, recipientHistory, setPayment, upsertRequest, type TenantMemory } from './tenant-store.ts';
 import qrcode from 'qrcode-generator';
 import Identicons from '@nimiq/identicons';
-import '@fontsource-variable/manrope';
-import '@fontsource-variable/dm-sans';
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
 import { addMonths, leaseMessage, leaseMonths, leaseRequest, leaseChargeId, requestMatchesLease, validateLease, publicLease, type Lease } from './lease.ts';
 
 type View = 'overview' | 'properties' | 'charges' | 'collections' | 'wallet';
@@ -262,7 +262,7 @@ function icon(name: string): string {
     'alert':'<path d="M12 3 2 21h20L12 3z"/><path d="M12 9v5M12 17h.01"/>',
     'layers':'<path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/>',
   };
-  return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.home}</svg>`;
+  return `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.home}</svg>`;
 }
 function navButton(view: View, label: string, glyph: string): string {
   return `<button class="nav-item ${selectedView===view?'active':''}" data-nav="${view}" type="button">${icon(glyph)}<span>${label}</span></button>`;
@@ -274,8 +274,8 @@ function walletIndicator(): string {
 }
 function shortAddress(a:string):string{const c=a.replace(/\s+/g,'');return c.slice(0,4)+' '+c.slice(4,8)+' … '+c.slice(-4);}
 function identityPanel():string{
-  if(landlordWallet)return `<section class="identity-card" aria-label="Your Nimiq Pay wallet">${identiconImg(landlordWallet,44)}<div><small>Signed in with Nimiq Pay</small><strong class="mono">${escapeHtml(shortAddress(landlordWallet))}</strong><span>Rent is paid to this wallet. Every request you send is signed by it.</span></div><button id="disconnect-wallet" class="tertiary" type="button">Change</button></section>`;
-  return `<section class="identity-card connect" aria-label="Connect Nimiq Pay"><div class="identity-icon">${icon('wallet')}</div><div><small>No account, no password</small><strong>Sign in with Nimiq Pay</strong><span>Your wallet is your account. Rent goes straight to it, and tenants can verify every request comes from you.</span></div><button id="connect-wallet" class="primary" type="button" ${walletBusy?'disabled':''}>${walletBusy?'Connecting…':'Connect'}</button></section>`;
+  if(landlordWallet)return `<section class="identity-card reveal" aria-label="Your Nimiq Pay wallet">${identiconImg(landlordWallet,44)}<div><small>Signed in with Nimiq Pay</small><strong class="mono">${escapeHtml(shortAddress(landlordWallet))}</strong><span>Rent is paid to this wallet. Every request you send is signed by it.</span></div><button id="disconnect-wallet" class="tertiary" type="button">Change</button></section>`;
+  return `<section class="identity-card connect reveal" aria-label="Connect Nimiq Pay"><div class="identity-icon">${icon('wallet')}</div><div><small>No account, no password</small><strong>Sign in with Nimiq Pay</strong><span>Your wallet is your account. Rent goes straight to it, and tenants can verify every request comes from you.</span></div><button id="connect-wallet" class="primary" type="button" ${walletBusy?'disabled':''}>${walletBusy?'Connecting…':'Connect'}</button></section>`;
 }
 /** Nimiq identicon for an address: the same picture Nimiq Pay shows for it. */
 const identiconCache=new Map<string,string>();
@@ -310,35 +310,53 @@ function chargeRailState(p:Portfolio,c:Charge,evidence:Record<string,TransferEvi
 }
 function unitBoard(p:Portfolio,evidence:Record<string,TransferEvidence[]>):string{
   const months=[-3,-2,-1,0].map(n=>addMonths(workspaceMonth,n));
-  const rows=p.units.map(u=>{
+  const rows=p.units.map((u,idx)=>{
     const prop=p.properties.find(x=>x.id===u.propertyId);
     const items=months.map(period=>{const c=p.charges.find(x=>x.unitId===u.id&&x.period===period);return {period,state:c?chargeRailState(p,c,evidence):'none' as RailState};});
     const cur=p.charges.find(x=>x.unitId===u.id&&x.period===workspaceMonth);
     const pr=cur?projectCharge(cur,evidence[cur.id]??[],p.submissions):null;
     const state=items[items.length-1].state;
     const tenant=preview?DEMO_UNITS.find(x=>x.id===u.id)?.tenant:unitTenants[u.id];
-    const right=!cur?'<span class="unit-amount muted">No request</span>':`<span class="unit-amount">${formatNim(cur.amountLuna)} <small>NIM</small></span><span class="tag ${state==='paid'?'green':state==='late'||state==='review'?'red':'amber'}">${state==='paid'?'Paid ✓':state==='partial'?`${formatNim(pr!.dueLuna)} left`:state==='late'?'Late':state==='review'?'Review':'Due'}</span>`;
-    return `<li class="unit-line">${tenant?identiconImg(tenant,38):`<span class="unit-initial">${escapeHtml(u.label.slice(0,2).toUpperCase())}</span>`}<div class="unit-main"><strong>${normalizeLabel(u.label)}</strong><small>${normalizeLabel(prop?.name||'')}</small>${rentRail(items)}</div><div class="unit-side">${right}</div></li>`;
+    const day=String(dueDays[u.id]??1).padStart(2,'0');
+    const lateDays=Math.max(0,Math.floor((Date.parse(localDay())-Date.parse(`${workspaceMonth}-${day}`))/86_400_000));
+    const status=!cur?'NO REQUEST':state==='paid'?'ARRIVED':state==='partial'?`PART ${formatNim(pr!.dueLuna)}`:state==='late'?`LATE ${lateDays}D`:state==='review'?'CHECK':'EXPECTED';
+    return `<li class="board-row st-${state}" style="--row:${idx}">
+      <span class="b-time">${day} ${escapeHtml(shortMonth(workspaceMonth).toUpperCase())}</span>
+      <span class="b-unit"><strong>${normalizeLabel(u.label)}</strong><small>${normalizeLabel(prop?.name||'')}</small></span>
+      <span class="b-from">${tenant?identiconImg(tenant,30):'<span class="b-dash">—</span>'}</span>
+      <span class="b-fare">${cur?formatNim(cur.amountLuna):'—'}</span>
+      <span class="b-status">${flap(status,`fl-${state}`)}</span>
+      <span class="b-rail">${rentRail(items,true)}</span>
+    </li>`;
   }).join('');
-  return `<section class="board" aria-label="Units this month"><div class="section-heading"><div><div class="eyebrow">YOUR UNITS</div><h2>Rent by unit</h2></div><button class="tertiary" data-nav="charges" type="button">Requests ${icon('arrow')}</button></div><ul class="unit-list">${rows}</ul></section>`;
+  return `<section class="board-shell reveal" aria-label="Rent arrivals"><div class="board">
+    <header class="board-head"><span class="board-title">${icon('layers')} RENT ARRIVALS</span><span class="board-clock">${escapeHtml(new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit',hour12:false}))}</span></header>
+    <div class="board-cols"><span>DUE</span><span>UNIT</span><span>FROM</span><span>NIM</span><span>STATUS</span></div>
+    <ul class="board-rows">${rows||'<li class="board-row"><span class="b-unit"><strong>No units yet</strong></span></li>'}</ul>
+  </div></section>`;
+}
+function flap(text:string,cls=''):string{
+  return `<span class="flap ${cls}" aria-label="${escapeHtml(text)}">${[...text].map((ch,i)=>`<i style="--d:${i*45}ms" aria-hidden="true">${ch===' '?'&nbsp;':escapeHtml(ch)}</i>`).join('')}</span>`;
 }
 function monthHero(p:Portfolio,evidence:Record<string,TransferEvidence[]>):string{
   const snap=monthSnapshot(p,workspaceMonth,'',evidence);
   const pct=snap.expectedLuna?Math.min(100,Math.round(snap.paidLuna/snap.expectedLuna*100)):0;
   const late=snap.lines.filter(l=>chargeRailState(p,l.charge,evidence)==='late').length;
-  return `<section class="month-hero" aria-label="This month">
-    <div class="month-hero-top"><div><div class="eyebrow">${escapeHtml(monthLabel(workspaceMonth).toUpperCase())}</div><h1>${formatNim(snap.paidLuna)} <span>of ${formatNim(snap.expectedLuna)} NIM collected</span></h1></div>
-      <div class="ring" style="--pct:${pct}"><span>${pct}%</span></div></div>
-    <div class="progress"><span style="width:${pct}%"></span></div>
-    <div class="month-hero-stats"><span><b>${snap.paidCount}</b> paid</span><span><b>${snap.charges-snap.paidCount}</b> open</span><span class="${late?'late':''}"><b>${late}</b> late</span><span><b>${formatNim(snap.outstandingLuna)}</b> NIM due</span></div>
-    ${preview?'':syncBar()}
+  return `<section class="hero-split reveal" aria-label="This month">
+    <div class="hero-copy"><span class="pill-tag">${escapeHtml(monthLabel(workspaceMonth))}</span>
+      <h1 class="display">${formatNim(snap.paidLuna)}<small> / ${formatNim(snap.expectedLuna)} NIM</small></h1>
+      <p class="lede">collected on Nimiq mainnet this month.</p>
+      <div class="hero-stats"><span><b>${snap.paidCount}</b>paid</span><span><b>${snap.charges-snap.paidCount}</b>open</span><span class="${late?'is-late':''}"><b>${late}</b>late</span></div>
+    </div>
+    <div class="gauge" style="--pct:${pct}"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52"/><circle class="gauge-fill" cx="60" cy="60" r="52" pathLength="100"/></svg><span><b>${pct}%</b><small>collected</small></span></div>
+    ${preview?'':`<div class="hero-sync">${syncBar()}</div>`}
   </section>`;
 }
 function activityFeed(p:Portfolio):string{
   const items=(preview?p.charges.filter(c=>demoEvidence(p)[c.id]).sort((a,b)=>b.period.localeCompare(a.period)).slice(0,4).map(c=>({c,amount:demoEvidence(p)[c.id][0].amountLuna,at:'',payer:DEMO_UNITS.find(u=>u.id===c.unitId)?.tenant})):
     storedProofs.slice().sort((a,b)=>b.verifiedAt.localeCompare(a.verifiedAt)).slice(0,5).flatMap(x=>{const c=p.charges.find(y=>y.id===x.chargeId);return c?[{c,amount:x.amountLuna,at:x.verifiedAt,payer:x.payer}]:[];}));
   if(!items.length)return '';
-  return `<section class="section" aria-label="Latest payments"><div class="section-heading"><div><div class="eyebrow">ON-CHAIN</div><h2>Latest payments</h2></div></div><ul class="feed">${items.map(({c,amount,at,payer})=>{const u=p.units.find(x=>x.id===c.unitId);return `<li>${payer?identiconImg(payer,32):`<span class="unit-initial small">${icon('check')}</span>`}<div><strong>${normalizeLabel(u?.label||'')} · ${escapeHtml(shortMonth(c.period))}</strong><small>${at?escapeHtml(at.slice(0,10)):'Confirmed'} · finalized on Nimiq</small></div><b>+${formatNim(amount)} NIM</b></li>`;}).join('')}</ul></section>`;
+  return `<section class="section reveal" aria-label="Latest payments"><div class="section-heading"><div><div class="eyebrow">ON-CHAIN</div><h2>Latest payments</h2></div></div><ul class="feed">${items.map(({c,amount,at,payer})=>{const u=p.units.find(x=>x.id===c.unitId);return `<li>${payer?identiconImg(payer,32):`<span class="unit-initial small">${icon('check')}</span>`}<div><strong>${normalizeLabel(u?.label||'')} · ${escapeHtml(shortMonth(c.period))}</strong><small>${at?escapeHtml(at.slice(0,10)):'Confirmed'} · finalized on Nimiq</small></div><b>+${formatNim(amount)} NIM</b></li>`;}).join('')}</ul></section>`;
 }
 function audienceNavigation():string{
   const tabs: Array<{id:Audience,label:string,detail:string}> = [
@@ -380,12 +398,16 @@ function overview(p: Portfolio): string {
   if(audience==='tenant')return tenantHome();
   const evidence=proofEvidence(p);
   const empty=!p.units.length;
-  if(empty&&!preview)return `<section class="landing">
-      <div class="landing-hero"><div class="eyebrow">RENT ON NIMIQ PAY</div><h1>Rent that pays itself <em>in.</em></h1><p>Sign a lease once with your Nimiq Pay wallet. Each month your tenant pays in one tap, and RentRail confirms it on Nimiq mainnet.</p>
-      ${rentRail([-3,-2,-1,0,1].map(n=>({period:addMonths(currentPeriod(),n),state:(n<0?'paid':n===0?'due':'none') as RailState})))}
-      <div class="landing-ctas"><button id="preview-demo" class="secondary" type="button">See a sample portfolio ${icon('arrow')}</button><button class="ghost" type="button" data-audience="tenant">I pay rent</button></div></div>
-      ${identityPanel()}
-      <ol class="how">${[['Connect','Sign in with your Nimiq Pay wallet. No account.'],['Sign a lease','Rent, due day, first month. Signed once.'],['Get paid','Tenants pay in one tap. Payments appear by themselves.']].map(([t,d],i)=>`<li><span>${i+1}</span><div><strong>${t}</strong><p>${d}</p></div></li>`).join('')}</ol>
+  if(empty&&!preview)return `<section class="landing hero-landing reveal">
+      <div class="landing-copy"><span class="pill-tag">Nimiq Pay mini app</span><h1 class="display">Rent that<br/>arrives <em>on time.</em></h1><p class="lede">Sign a lease once with your Nimiq Pay wallet. Every month your tenant pays in one tap, and the payment pulls into your ledger on Nimiq mainnet.</p>
+      <div class="landing-ctas"><button id="preview-demo" class="primary" type="button">See it with sample units ${icon('arrow')}</button><button class="ghost" type="button" data-audience="tenant">I pay rent</button></div></div>
+      <div class="landing-art" aria-hidden="true">
+        <div class="mini-ticket"><div class="ticket-top"><span class="ticket-brand">RentRail</span><span class="ticket-kind">RENT TICKET</span></div><div class="mt-route"><span>YOU</span><i></i><span>MAPLE · 2B</span></div><div class="mt-fare"><small>FARE</small><b>1250<em> NIM</em></b></div><div class="stamp small">PAID</div></div>
+        <div class="mini-board">${['ARRIVED','ARRIVED','EXPECTED'].map((st,i)=>`<div class="mb-row"><span>0${i+1} NOV</span><span>APT ${101+i}</span>${flap(st,i<2?'fl-paid':'fl-due')}</div>`).join('')}</div>
+      </div>
+    </section>
+    ${identityPanel()}
+    <ol class="how reveal">${[['Connect','Sign in with your Nimiq Pay wallet. No account.'],['Sign a lease','Rent, due day, first month. Signed once.'],['Get paid','Tenants pay in one tap. Payments arrive by themselves.']].map(([t,d],i)=>`<li><span>0${i+1}</span><div><strong>${t}</strong><p>${d}</p></div></li>`).join('')}</ol>
     </section>${whyNimiq()}`;
   return `${preview?'':identityPanel()}
     ${monthHero(p,evidence)}
@@ -413,7 +435,7 @@ function whyNimiq():string{
     ['receipt','The reference rides on-chain','The RR1 code travels inside the Nimiq transaction, so each payment finds its unit and month.'],
     ['check','Native approval, fast finality','Tenants approve in the Nimiq Pay sheet. Final in about a minute, for a fraction of a cent.'],
   ];
-  return `<section class="why-nimiq section" aria-label="Why Nimiq Pay"><div class="section-heading"><div><div class="eyebrow">BUILT ON NIMIQ PAY</div><h2>Why this only works here</h2></div></div>
+  return `<section class="why-nimiq section reveal" aria-label="Why Nimiq Pay"><div class="section-heading"><div><div class="eyebrow">BUILT ON NIMIQ PAY</div><h2>Why this only works here</h2></div></div>
     <div class="why-grid">${items.map(([i,t,d])=>`<article><span>${icon(i)}</span><h3>${escapeHtml(t)}</h3><p>${escapeHtml(d)}</p></article>`).join('')}</div></section>`;
 }
 function myRentPanel():string{
@@ -706,26 +728,44 @@ function tenantView(request:SharedRequest):string {
   const late=due&&localDay()>due&&payState!=='confirmed';
   const leaseEntries=request.lease?tenantMemory.entries.filter(e=>e.request.lease?.id===request.lease!.id).sort((a,b)=>a.request.period.localeCompare(b.request.period)).slice(-6):[];
   const rail=leaseEntries.length>1?rentRail(leaseEntries.map(e=>({period:e.request.period,state:(e.payment?.state==='confirmed'||(e.request.chargeId===request.chargeId&&payState==='confirmed')?'paid':e.request.period<currentPeriod()?'late':'due') as RailState}))):'';
+  const [y,m]=request.period.split('-');
+  const paid=payState==='confirmed';
   return `<div class="checkout pay-sheet">
-  <div class="payee-card ${trust.level}">
-    ${addressOk?identiconImg(request.recipient,64):''}
-    <div class="payee-text"><small>Rent for ${escapeHtml(monthLabel(request.period))}</small><strong>${request.title?escapeHtml(request.title):'Your landlord'}</strong><span class="trust-chip ${trust.level}">${trust.level==='signed'?`${icon('shield')} Signed by landlord`:trust.level==='unsigned'?`${icon('alert')} Not signed`:`${icon('alert')} Link modified`}</span></div>
-  </div>
-  <div class="amount-block"><div class="checkout-value">${formatNim(request.amountLuna)} <span>NIM</span></div>${due?`<div class="due ${late?'late':''}">${late?'Late · was due':'Due'} ${escapeHtml(new Date(due+'T00:00:00Z').toLocaleDateString('en',{month:'long',day:'numeric',timeZone:'UTC'}))}</div>`:''}</div>
-  ${rail?`<div class="sheet-rail">${rail}</div>`:''}
-  <div class="checkout-card">
+  <div class="ticket-wrap reveal"><article class="ticket ${trust.level} ${paid?'is-paid':''}" aria-label="Rent ticket">
+    <div class="ticket-main">
+      <div class="ticket-top"><span class="ticket-brand"><span class="brand-symbol">R<span>·</span></span>RentRail</span><span class="ticket-kind">RENT TICKET</span></div>
+      <div class="route">
+        <div class="stop"><small>FROM</small><span class="you-dot">${tenantMemory.wallet?identiconImg(tenantMemory.wallet,40):icon('wallet')}</span><strong>You</strong></div>
+        <div class="route-line" aria-hidden="true"><span class="train"></span></div>
+        <div class="stop to"><small>TO</small>${addressOk?identiconImg(request.recipient,40):''}<strong>${request.title?escapeHtml(request.title):'Your landlord'}</strong></div>
+      </div>
+      <div class="ticket-grid">
+        <div><small>MONTH</small><b>${escapeHtml(shortMonth(request.period).toUpperCase())} ${escapeHtml(y)}</b></div>
+        <div><small>DUE</small><b class="${late?'is-late':''}">${due?escapeHtml(due.slice(8)+' '+shortMonth(request.period).toUpperCase()):'—'}</b></div>
+        <div class="fare"><small>FARE</small><b>${formatNim(request.amountLuna)}<em> NIM</em></b></div>
+      </div>
+    </div>
+    <div class="perf" aria-hidden="true"></div>
+    <div class="ticket-stub">
+      <div><small>TICKET NO.</small><b class="mono">${escapeHtml(request.memo.slice(4,12).toUpperCase())}·${escapeHtml(m)}</b></div>
+      <span class="trust-chip ${trust.level}">${trust.level==='signed'?`${icon('shield')} Validated · landlord signature`:trust.level==='unsigned'?`${icon('alert')} Not signed`:`${icon('alert')} Modified · do not pay`}</span>
+    </div>
+    ${paid?'<div class="stamp" aria-label="Paid">PAID<small>NIMIQ MAINNET</small></div>':''}
+  </article></div>
+  ${rail?`<div class="sheet-rail reveal">${rail}</div>`:''}
+  <div class="checkout-card reveal">
     <div class="trust-banner ${trust.level}" role="status">${icon(trust.level==='signed'?'shield':'alert')}<span>${escapeHtml(trust.text)}</span></div>
-    <div class="detail"><span>Pay to</span><strong class="mono">${escapeHtml(addressOk?formatNimiqAddress(request.recipient):request.recipient)}</strong></div>
-    ${addressOk?'<p class="identicon-hint">Nimiq Pay shows the same picture next to the recipient in its confirmation. Check that they match.</p>':''}
-    <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(request.memo.slice(0,14))}…</strong></div>
     ${addressOk?historyNote:'<div class="trust-line bad">✗ Invalid address: do not pay.</div>'}
-    <details class="crosscheck"><summary>Compare with the address your landlord gave you</summary>
-      <form id="recipient-crosscheck-form" class="form-stack"><label>Address from your landlord<textarea name="confirmedRecipient" rows="2" maxlength="80" spellcheck="false" autocomplete="off" required placeholder="NQ.."></textarea></label><button class="tertiary" type="submit">Compare</button></form>
+    <details class="crosscheck"><summary>Receiving address and safety checks</summary>
+      <div class="detail"><span>Pay to</span><strong class="mono">${escapeHtml(addressOk?formatNimiqAddress(request.recipient):request.recipient)}</strong></div>
+      ${addressOk?'<p class="identicon-hint">Nimiq Pay shows the same picture next to the recipient in its confirmation. Check that they match.</p>':''}
+      <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(request.memo)}</strong></div>
+      <form id="recipient-crosscheck-form" class="form-stack"><label>Address your landlord gave you<textarea name="confirmedRecipient" rows="2" maxlength="80" spellcheck="false" autocomplete="off" required placeholder="NQ.."></textarea></label><button class="tertiary" type="submit">Compare</button></form>
       ${tenantRecipientComparison?`<div role="status" class="inline-alert">${escapeHtml(tenantRecipientComparison)}</div>`:''}
     </details>
     <div class="pay-zone">${tenantPaySection(request)}</div>
     ${otherOpenMonths(request)}
-  </div>${tenantEvidencePanel(request)}<p class="checkout-foot"><a href="/">My rent on RentRail</a></p>${payState==='confirmed'&&paidHash?receiptMarkup(tenantAudit(request,paidHash),receiptResult):''}</div>`;
+  </div>${tenantEvidencePanel(request)}<p class="checkout-foot"><a href="/">My rent on RentRail</a></p>${paid&&paidHash?receiptMarkup(tenantAudit(request,paidHash),receiptResult):''}</div>`;
 }
 function tenantAudit(request:SharedRequest,hash:string):PublicPaymentAudit{
   const claim=entryFor(tenantMemory,request.chargeId)?.payment?.claim;
@@ -814,6 +854,20 @@ function render():void {
     </div></div>`;
   bindEvents();
   hydrateIdenticons();
+  revealOnEnter();
+}
+let lastRevealKey='';
+/** Entry animations play once per screen, not on every re-render. */
+function revealOnEnter():void{
+  const key=(publicAudit?'audit':tenantRequest?'pay':selectedView)+(preview?':sample':'');
+  const fresh=key!==lastRevealKey;lastRevealKey=key;
+  const els=root!.querySelectorAll<HTMLElement>('.reveal');
+  if(!fresh||!('IntersectionObserver' in window)||matchMedia('(prefers-reduced-motion: reduce)').matches){els.forEach(el=>el.classList.add('in','no-anim'));return;}
+  root!.classList.add('animate');
+  const io=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){(e.target as HTMLElement).classList.add('in');io.unobserve(e.target);}}),{rootMargin:'0px 0px -8% 0px'});
+  els.forEach((el,i)=>{el.style.setProperty('--i',String(Math.min(i,6)));io.observe(el);});
+  // Never leave content hidden if the observer does not fire (some webviews).
+  setTimeout(()=>els.forEach(el=>el.classList.add('in')),2200);
 }
 function success(message:string):void { toast=message; render(); setTimeout(()=>{ toast='';render(); },4600); }
 // Errors must not re-render: the user's form input stays in place so they can fix it.
