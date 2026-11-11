@@ -11,6 +11,8 @@ export interface StoredProof {
   hash: string;
   amountLuna: number;
   verifiedAt: string;
+  /** Wallet that proved it paid (signature in the proof link), when known. */
+  payer?: string;
 }
 export const PROOF_STORAGE_KEY = 'rentrail-verified-payments-v1';
 export const MAX_PROOFS = 2000;
@@ -39,7 +41,9 @@ export function parseProofs(raw: string | null, knownChargeIds?: ReadonlySet<str
     if (!validProof(row) || seen.has(row.hash)) continue;
     seen.add(row.hash);
     if (knownChargeIds && !knownChargeIds.has(row.chargeId)) continue;
-    out.push({ chargeId: row.chargeId, hash: row.hash, amountLuna: row.amountLuna, verifiedAt: row.verifiedAt });
+    const proof: StoredProof = { chargeId: row.chargeId, hash: row.hash, amountLuna: row.amountLuna, verifiedAt: row.verifiedAt };
+    if (typeof row.payer === 'string' && /^NQ[0-9]{2}[0-9A-Z ]{32,40}$/.test(row.payer)) proof.payer = row.payer;
+    out.push(proof);
   }
   return out;
 }
@@ -51,7 +55,12 @@ export function addProof(proofs: readonly StoredProof[], proof: StoredProof): { 
   const candidate = { ...proof, hash };
   if (!validProof(candidate)) throw Error('Invalid payment proof.');
   const existing = proofs.find(p => p.hash === hash);
-  if (existing) return { proofs: [...proofs], outcome: existing.chargeId === proof.chargeId ? 'ALREADY_RECORDED' : 'USED_BY_OTHER_CHARGE' };
+  if (existing) {
+    if (existing.chargeId !== proof.chargeId) return { proofs: [...proofs], outcome: 'USED_BY_OTHER_CHARGE' };
+    // Same payment seen again: keep it, but learn the payer if this proof identifies one.
+    if (proof.payer && !existing.payer) return { proofs: proofs.map(p => p.hash === hash ? { ...p, payer: proof.payer } : p), outcome: 'ALREADY_RECORDED' };
+    return { proofs: [...proofs], outcome: 'ALREADY_RECORDED' };
+  }
   if (proofs.length >= MAX_PROOFS) throw Error('Too many stored payment proofs on this device.');
   return { proofs: [...proofs, candidate], outcome: 'ADDED' };
 }

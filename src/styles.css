@@ -197,3 +197,47 @@
 .form-duo>*,.form-stack label,.panel,.stack{min-width:0}.form-stack input,.form-stack textarea,.form-stack select{width:100%}
 .toast-error{background:#7a2a22}
 @media(max-width:700px){.form-duo{grid-template-columns:1fr}.main-wrap{overflow-x:hidden}}
+
+/* Identity, signatures, trust */
+.identity-card{display:flex;align-items:center;gap:16px;background:white;border:1px solid var(--line);border-radius:17px;padding:18px 20px;margin:22px 0 0}
+.identity-card.connect{border-color:#cfe0fb;background:#f5f9ff}
+.identity-icon{width:44px;height:44px;border-radius:13px;background:#eef3ff;color:#376fe8;display:flex;align-items:center;justify-content:center;flex:none}
+.identity-card>div:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.identity-card small{font-size:10px;font-weight:800;letter-spacing:1px;color:#7f93ae;text-transform:uppercase}
+.identity-card strong{font-size:14px;overflow-wrap:anywhere}.identity-card strong.mono{font-size:12px}
+.identity-card span{font-size:12px;color:#6f8199;line-height:1.5}
+.trust-banner{display:flex;gap:10px;align-items:flex-start;border-radius:12px;padding:12px 14px;font-size:12px;font-weight:700;line-height:1.5;margin-bottom:18px}
+.trust-banner.signed{background:#ebfaf2;color:#1f7f4b}.trust-banner.unsigned{background:#fff6e5;color:#8d612e}.trust-banner.tampered{background:#ffecea;color:#a3362c}
+.trust-line{font-size:11px;font-weight:700;border-radius:9px;padding:8px 11px;margin:-4px 0 14px;background:#f3f6fa;color:#5d708a}
+.trust-line.ok{background:#ebfaf2;color:#23794b}.trust-line.bad{background:#fff0ee;color:#b4473c}
+.inline-alert.danger{background:#ffecea;color:#a3362c;font-weight:700}
+.sig-badge{font-size:10px;font-weight:800;color:#23794b;background:#ebfaf2;border-radius:20px;padding:5px 8px;white-space:nowrap}
+.tiny.warn{background:#fff3dc;color:#9a6a1f}
+.locked-field{display:flex;flex-direction:column;gap:4px;background:#f5f9ff;border:1px solid #d5e2fb;border-radius:10px;padding:11px 12px}
+.locked-field small{font-size:11px;font-weight:800;color:#667d9b}.locked-field strong{font-size:11px;overflow-wrap:anywhere}
+.consent{margin:4px 0 10px}
+.pill-x{border:0;background:transparent;color:#a3362c;font-weight:900;padding:0 2px}
+.why-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.why-grid article{background:white;border:1px solid var(--line);border-radius:15px;padding:18px}
+.why-grid article>span{display:inline-flex;width:34px;height:34px;border-radius:10px;background:#f1f8df;color:#4d7a12;align-items:center;justify-content:center}
+.why-grid h3{font-size:15px;margin:12px 0 6px}.why-grid p{font-size:12px;line-height:1.6;color:#6f8199;margin:0}
+a.charge-row{color:inherit}
+@media(max-width:700px){.why-grid{grid-template-columns:1fr}.identity-card{flex-wrap:wrap}.identity-card .primary{width:100%}}
+
+/* Printable receipt: hidden on screen, the only thing printed */
+.receipt{display:none}
+@media print{
+  body *{visibility:hidden}
+  .receipt,.receipt *{visibility:visible}
+  .receipt{display:block;position:absolute;left:0;top:0;width:100%;padding:28px 34px;color:#111;font-family:'DM Sans',system-ui,sans-serif}
+  .receipt header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:12px}
+  .receipt header strong{font-size:22px;display:block}.receipt header span{font-size:11px;color:#444}
+  .receipt-badge{border:2px solid #1f7f4b;color:#1f7f4b !important;font-weight:900;padding:6px 10px;border-radius:6px;font-size:13px}
+  .receipt h2{font-size:18px;margin:18px 0}
+  .receipt dl{margin:0;display:grid;gap:8px}.receipt dl>div{display:grid;grid-template-columns:120px 1fr;gap:12px;font-size:12px}
+  .receipt dt{color:#555;font-weight:700}.receipt dd{margin:0;overflow-wrap:anywhere}
+  .receipt footer{display:flex;gap:18px;align-items:center;margin-top:22px;border-top:1px solid #ccc;padding-top:14px}
+  .receipt-qr{width:130px;height:130px;flex:none}.receipt-qr svg{width:130px;height:130px}
+  .receipt footer p{font-size:10px;color:#444;line-height:1.5}
+  .mobile-nav,.toast{display:none !important}
+}

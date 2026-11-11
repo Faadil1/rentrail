@@ -21,7 +21,12 @@ export interface Charge {
   recipient: string;
   memo: string; // opaque public reference, <=64 UTF-8 bytes
   createdAt: string;
+  /** Shown to the tenant, e.g. "Maple Court · Apt 2B". Covered by the landlord's signature. */
+  title?: string;
+  /** Landlord's Nimiq wallet signature over rentRequestMessage(). */
+  sig?: Signed;
 }
+export interface Signed { publicKey: string; signature: string }
 export interface TransferEvidence {
   network: Network;
   hash: string;
@@ -58,6 +63,21 @@ export interface SharedRequest {
   amountLuna: number;
   period: string;
   chargeId: string;
+  title?: string;
+  sig?: Signed;
+}
+const HEX = (n: number) => new RegExp(`^[0-9a-f]{${n}}$`);
+export function validTitle(v: unknown): v is string {
+  return typeof v === 'string' && v.trim().length > 0 && v.length <= 80 && !/[\u0000-\u001f\u007f]/.test(v);
+}
+export function validSigned(v: unknown): v is Signed {
+  if (!v || typeof v !== 'object') return false;
+  const x = v as Record<string, unknown>;
+  return typeof x.publicKey === 'string' && HEX(64).test(x.publicKey) && typeof x.signature === 'string' && HEX(128).test(x.signature);
+}
+/** JSON with every non-ASCII character escaped, so it survives btoa() and signatures stay byte-exact. */
+export function asciiJson(value: unknown): string {
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 }
 
 export function emptyPortfolio(): Portfolio {
@@ -122,6 +142,8 @@ export function addCharge(p: Portfolio, charge: Charge): Portfolio {
   if (p.charges.some(x => x.unitId === charge.unitId && x.period === charge.period)) {
     throw new Error('An obligation for this unit and period already exists.');
   }
+  if (charge.title !== undefined && !validTitle(charge.title)) throw new Error('Invalid request title.');
+  if (charge.sig !== undefined && !validSigned(charge.sig)) throw new Error('Invalid signature.');
   return { ...p, charges: [...p.charges, { ...charge, recipient: normalizeAddress(charge.recipient) }] };
 }
 export function recordSubmission(p: Portfolio, submission: Submission): Portfolio {
@@ -158,7 +180,10 @@ export function projectCharge(charge: Charge, evidence: TransferEvidence[], subm
   return { status, creditedLuna, dueLuna: Math.max(0, charge.amountLuna - creditedLuna), exceptions, verifiedHashes };
 }
 export function shareableRequest(charge: Charge): SharedRequest {
-  return { v: 1, chargeId: charge.id, recipient: charge.recipient, amountLuna: charge.amountLuna, memo: charge.memo, period: charge.period };
+  const r: SharedRequest = { v: 1, chargeId: charge.id, recipient: charge.recipient, amountLuna: charge.amountLuna, memo: charge.memo, period: charge.period };
+  if (charge.title) r.title = charge.title;
+  if (charge.sig) r.sig = charge.sig;
+  return r;
 }
 export function validateSharedRequest(raw: unknown): SharedRequest {
   if (!raw || typeof raw !== 'object') throw new Error('Invalid payment request.');
@@ -169,5 +194,14 @@ export function validateSharedRequest(raw: unknown): SharedRequest {
   if (typeof x.amountLuna !== 'number' || !isSafeLuna(x.amountLuna)) throw new Error('Invalid amount.');
   if (typeof x.period !== 'string') throw new Error('Invalid period.');
   assertPeriod(x.period);
-  return { v: 1, chargeId: x.chargeId, memo: x.memo, recipient: normalizeAddress(x.recipient), amountLuna: x.amountLuna, period: x.period };
+  const out: SharedRequest = { v: 1, chargeId: x.chargeId, memo: x.memo, recipient: normalizeAddress(x.recipient), amountLuna: x.amountLuna, period: x.period };
+  if (x.title !== undefined) { if (!validTitle(x.title)) throw new Error('Invalid request title.'); out.title = x.title; }
+  if (x.sig !== undefined) { if (!validSigned(x.sig)) throw new Error('Invalid signature format.'); out.sig = { publicKey: x.sig.publicKey, signature: x.sig.signature }; }
+  return out;
+}
+/** Attaches (or replaces) the landlord signature on an existing request. */
+export function setChargeSignature(p: Portfolio, chargeId: string, sig: Signed): Portfolio {
+  if (!validSigned(sig)) throw new Error('Invalid signature.');
+  if (!p.charges.some(c => c.id === chargeId)) throw new Error('Unknown charge.');
+  return { ...p, charges: p.charges.map(c => c.id === chargeId ? { ...c, sig } : c) };
 }
