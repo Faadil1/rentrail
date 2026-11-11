@@ -19,8 +19,8 @@ The guided Beta now offers three entry choices:
 | **I pay rent** | Understand a shared request, confirm receiver identity outside the link, read blockchain proof for a transaction already sent |
 | **Show me RentRail** | Explore fictional properties and monthly reports, without changing your actual local workspace or sending NIM |
 
-**Guided experience Beta, separate from main:** https://rentrail-operations-staging-ik0s1mato-faadil1s-projects.vercel.app/  
-Source SHA `098f3683a7e5adf414cf9ba13cfb7e520325837b`; [260/260 tests and build PASS](https://github.com/Faadil1/rentrail/actions/runs/42932023609). Non-production Staging READY, live send disabled. iPhone Nimiq Pay visual/interaction review still pending.
+**Guided experience Beta, separate from main:** https://rentrail-operations-staging-lrlyqxhla-faadil1s-projects.vercel.app/  
+Exact deployed app source SHA `8af5f3161936fd4dc998f3fbdbb05d16a6d020fd`; Vercel deployment `dpl_EnHxCczzSn5oN9zwWbwdzJJanz6q` (**staging, READY**). [260/260 tests and TS/Vite build PASS](https://github.com/Faadil1/rentrail/actions/runs/42932576063). No live-send environment variables. iPhone Nimiq Pay visual/interaction review still pending.
 
 **Payment status glossary:** *Requested* means a local draft; *Hash received* means not independently verified; *Matched on-chain* means one RPC history node reported final matching; *Needs review* means incomplete, partial, mismatched or uncertain, and does not establish legal rent owed.
 
