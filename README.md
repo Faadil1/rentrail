@@ -5,6 +5,27 @@ RentRail is a **Nimiq Pay Mini App** for tenant/landlord payment coordination. P
 
 > **Cycle III / PAY submission candidate · MIT License · Mainnet-aware.** This repository contains a working **rent ledger + mainnet verification** app, not a licensed rent collector or a guarantee that rent is legally discharged.
 
+## Understand RentRail in 30 seconds
+
+**The problem:** A wallet transaction only says that NIM moved. A landlord and tenant also need to know **which rental unit, which month, whether the payment matches the amount requested, and what remains for review**.
+
+**RentRail's value:** local monthly rent requests + recurring due-date management + links to Nimiq Pay + **read-only blockchain evidence**, with no automatic false "paid" status. This prototype uses local browser data; shared owner/tenant accounts and repeatable live NIM transfers are **not** available in the public demo.
+
+The guided Beta now offers three entry choices:
+
+| Pick this | What you can do without wallet funds |
+|---|---|
+| **I manage rentals** | Add building → unit → monthly rent request → due-day review → verify an already-sent payment |
+| **I pay rent** | Understand a shared request, confirm receiver identity outside the link, read blockchain proof for a transaction already sent |
+| **Show me RentRail** | Explore fictional properties and monthly reports, without changing your actual local workspace or sending NIM |
+
+**Guided experience Beta, separate from main:** https://rentrail-operations-staging-ik0s1mato-faadil1s-projects.vercel.app/  
+Source SHA `098f3683a7e5adf414cf9ba13cfb7e520325837b`; [260/260 tests and build PASS](https://github.com/Faadil1/rentrail/actions/runs/42932023609). Non-production Staging READY, live send disabled. iPhone Nimiq Pay visual/interaction review still pending.
+
+**Payment status glossary:** *Requested* means a local draft; *Hash received* means not independently verified; *Matched on-chain* means one RPC history node reported final matching; *Needs review* means incomplete, partial, mismatched or uncertain, and does not establish legal rent owed.
+
+[Product clarity specification, including known limitations](docs/PRODUCT_CLARITY_GUIDED_V1.md).
+
 ## Try the app
 
 **Public, non-production read-only Mini App (READY build):** https://rentrail-operations-staging-bqetxdq5d-faadil1s-projects.vercel.app/  
