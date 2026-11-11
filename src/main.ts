@@ -1,6 +1,6 @@
 import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
-import { journeySteps,validAudience,parseManualPaymentReview,statusExplanations,type Audience,type ManualPaymentReviewFields } from './journey.ts';
+import { journeySteps,validAudience,parseManualPaymentReview,describeManualProof,statusExplanations,type Audience,type ManualPaymentReviewFields } from './journey.ts';
 import { collectionQueue,collectionCsv,reminderDraft,validDueDay,type DueDays } from './collections.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
@@ -379,10 +379,12 @@ function walletView():string {
   <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>Normal previews cannot initiate wallet payment. A dedicated, human-approved capped mainnet test build would additionally require fresh host + public RPC checks and native confirmation. We never request private keys or equate a hash with final settlement.</p></div></div>`;
 }
 function standaloneLookupPanel():string{
+  const proof=manualReviewResult ? describeManualProof(parseNim(manualReviewFields.amountNim),manualReviewResult.amountLuna,manualReviewResult.state) : null;
   const status=manualReviewResult ? `<div class="g3-result" id="standalone-result" role="status">
-    <strong>${manualReviewResult.state==='FINAL_MATCHED'?'A public node reports a matching final transfer':escapeHtml(manualReviewResult.state.replaceAll('_',' '))}</strong>
+    <strong>${escapeHtml(proof?.heading??'Review required')}</strong>
     <p>${escapeHtml(manualReviewResult.message)}</p>
-    ${manualReviewResult.state==='FINAL_MATCHED'&&typeof manualReviewResult.amountLuna==='number'? `<p>Observed on-chain: <b>${formatNim(manualReviewResult.amountLuna)} NIM</b> (${manualReviewResult.amountLuna} Luna).</p>`:''}
+    ${manualReviewResult.state==='FINAL_MATCHED'&&typeof manualReviewResult.amountLuna==='number'? `<p>Node-reported transfer: <b>${formatNim(manualReviewResult.amountLuna)} NIM</b> (${manualReviewResult.amountLuna} Luna); requested: ${formatNim(parseNim(manualReviewFields.amountNim))} NIM.</p>`:''}
+    ${proof?.kind==='PARTIAL_NODE_MATCH'&&proof.remainingLuna!==null?`<p><strong>${formatNim(proof.remainingLuna)} NIM remains unmatched</strong> according to this one-node check. This does not establish a legal debt.</p>`:''}
     <small>${escapeHtml(manualReviewResult.observedAt)} · One public RPC history node, not a legal rent receipt</small>
     </div>` : '';
   return `<section class="standalone-verify panel" aria-label="Verify an already-sent Nimiq transaction">
