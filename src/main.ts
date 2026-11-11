@@ -24,8 +24,9 @@ import { verifySignedMessage, rentRequestMessage, paymentClaimMessage, sameAddre
 import { TENANT_KEY, emptyTenantMemory, entryFor, parseTenantMemory, recipientHistory, setPayment, upsertRequest, type TenantMemory } from './tenant-store.ts';
 import qrcode from 'qrcode-generator';
 import Identicons from '@nimiq/identicons';
-import '@fontsource-variable/geist';
-import '@fontsource-variable/geist-mono';
+import '@fontsource-variable/archivo/wdth.css';
+import '@fontsource/courier-prime/400.css';
+import '@fontsource/courier-prime/700.css';
 import { addMonths, leaseMessage, leaseMonths, leaseRequest, leaseChargeId, requestMatchesLease, validateLease, publicLease, type Lease } from './lease.ts';
 
 type View = 'overview' | 'properties' | 'charges' | 'collections' | 'wallet';
@@ -292,9 +293,18 @@ function hydrateIdenticons():void{
 }
 type RailState='paid'|'partial'|'due'|'late'|'review'|'none';
 /** The rent rail: one station per month, filled when the rent is confirmed on-chain. */
-function rentRail(items:{period:string;state:RailState;label?:string}[],compact=false):string{
+function rentRail(items:{period:string;state:RailState;label?:string}[],compact=false,color=''):string{
   const name:Record<RailState,string>={paid:'Paid',partial:'Partly paid',due:'Due',late:'Late',review:'Needs review',none:'No request'};
-  return `<ol class="rail ${compact?'compact':''}" aria-label="Rent by month">${items.map(i=>`<li class="station st-${i.state}" title="${escapeHtml(monthLabel(i.period))}: ${name[i.state]}"><span class="dot">${i.state==='paid'?'✓':i.state==='late'?'!':''}</span>${compact?'':`<small>${escapeHtml(shortMonth(i.period))}</small>`}</li>`).join('')}</ol>`;
+  return `<ol class="rail ${compact?'compact':''}" ${color?`style="--line:${color}"`:''} aria-label="Rent by month">${items.map(i=>`<li class="station st-${i.state}" title="${escapeHtml(monthLabel(i.period))}: ${name[i.state]}"><small>${escapeHtml(shortMonth(i.period).charAt(0))}</small><span class="dot">${i.state==='paid'?'✓':i.state==='late'?'!':''}</span>${compact?'':`<em>${escapeHtml(shortMonth(i.period))}</em>`}</li>`).join('')}</ol>`;
+}
+const LINE_COLORS=['#FF5B1F','#2433A0','#00A99D','#F5B700','#E8458B','#5B8C2A'];
+function unitColor(p:Portfolio,unitId:string):string{const i=p.units.findIndex(u=>u.id===unitId);return LINE_COLORS[(i<0?0:i)%LINE_COLORS.length];}
+function unitBullet(p:Portfolio,unitId:string,label:string):string{
+  const short=label.replace(/^(apt|unit|appt|apartment|studio)\s*/i,m=>/studio/i.test(m)?'S':'').replace(/\s+/g,'').slice(0,3).toUpperCase()||'•';
+  return `<span class="bullet" style="--line:${unitColor(p,unitId)}">${escapeHtml(short)}</span>`;
+}
+function stamp(text:string,kind:string,sub=''):string{
+  return `<span class="stamp-mark sm-${kind}"><b>${escapeHtml(text)}</b>${sub?`<small>${escapeHtml(sub)}</small>`:''}</span>`;
 }
 function shortMonth(period:string):string{
   const [y,m]=period.split('-').map(Number);
@@ -312,43 +322,38 @@ function unitBoard(p:Portfolio,evidence:Record<string,TransferEvidence[]>):strin
   const months=[-3,-2,-1,0].map(n=>addMonths(workspaceMonth,n));
   const rows=p.units.map((u,idx)=>{
     const prop=p.properties.find(x=>x.id===u.propertyId);
-    const items=months.map(period=>{const c=p.charges.find(x=>x.unitId===u.id&&x.period===period);return {period,state:c?chargeRailState(p,c,evidence):'none' as RailState};});
     const cur=p.charges.find(x=>x.unitId===u.id&&x.period===workspaceMonth);
     const pr=cur?projectCharge(cur,evidence[cur.id]??[],p.submissions):null;
-    const state=items[items.length-1].state;
+    const state:RailState=cur?chargeRailState(p,cur,evidence):'none';
     const tenant=preview?DEMO_UNITS.find(x=>x.id===u.id)?.tenant:unitTenants[u.id];
     const day=String(dueDays[u.id]??1).padStart(2,'0');
     const lateDays=Math.max(0,Math.floor((Date.parse(localDay())-Date.parse(`${workspaceMonth}-${day}`))/86_400_000));
-    const status=!cur?'NO REQUEST':state==='paid'?'ARRIVED':state==='partial'?`PART ${formatNim(pr!.dueLuna)}`:state==='late'?`LATE ${lateDays}D`:state==='review'?'CHECK':'EXPECTED';
-    return `<li class="board-row st-${state}" style="--row:${idx}">
-      <span class="b-time">${day} ${escapeHtml(shortMonth(workspaceMonth).toUpperCase())}</span>
-      <span class="b-unit"><strong>${normalizeLabel(u.label)}</strong><small>${normalizeLabel(prop?.name||'')}</small></span>
-      <span class="b-from">${tenant?identiconImg(tenant,30):'<span class="b-dash">—</span>'}</span>
-      <span class="b-fare">${cur?formatNim(cur.amountLuna):'—'}</span>
-      <span class="b-status">${flap(status,`fl-${state}`)}</span>
-      <span class="b-rail">${rentRail(items,true)}</span>
-    </li>`;
+    const st=!cur?'':state==='paid'?stamp('PAID','paid'):state==='partial'?stamp('PART','part',`${formatNim(pr!.dueLuna)} left`):state==='late'?stamp('LATE','late',`${lateDays} days`):state==='review'?stamp('CHECK','late'):stamp('DUE','due',`${day} ${shortMonth(workspaceMonth)}`);
+    return `<tr style="--row:${idx}"><td>${unitBullet(p,u.id,u.label)}<span class="ledger-unit"><strong>${normalizeLabel(u.label)}</strong><small>${normalizeLabel(prop?.name||'')}</small></span></td><td class="l-tenant">${tenant?identiconImg(tenant,28):'<span class="muted">—</span>'}</td><td class="l-amt">${cur?formatNim(cur.amountLuna):'—'}</td><td class="l-st">${st}</td></tr>`;
   }).join('');
-  return `<section class="board-shell reveal" aria-label="Rent arrivals"><div class="board">
-    <header class="board-head"><span class="board-title">${icon('layers')} RENT ARRIVALS</span><span class="board-clock">${escapeHtml(new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit',hour12:false}))}</span></header>
-    <div class="board-cols"><span>DUE</span><span>UNIT</span><span>FROM</span><span>NIM</span><span>STATUS</span></div>
-    <ul class="board-rows">${rows||'<li class="board-row"><span class="b-unit"><strong>No units yet</strong></span></li>'}</ul>
-  </div></section>`;
+  const lines=p.units.map(u=>{
+    const items=months.map(period=>{const c=p.charges.find(x=>x.unitId===u.id&&x.period===period);return {period,state:c?chargeRailState(p,c,evidence):'none' as RailState};});
+    return `<div class="line-row">${unitBullet(p,u.id,u.label)}${rentRail(items,false,unitColor(p,u.id))}</div>`;
+  }).join('');
+  return `<section class="ledger-page reveal" aria-label="Rent ledger">
+    <header class="ledger-head"><h2>Ledger</h2><span>${escapeHtml(monthLabel(workspaceMonth))}</span></header>
+    <table class="ledger"><thead><tr><th>Unit</th><th>Tenant</th><th>NIM</th><th>Status</th></tr></thead><tbody>${rows||'<tr><td colspan="4">No units yet.</td></tr>'}</tbody></table>
+  </section>
+  ${lines?`<section class="lines-map reveal" aria-label="Rent lines"><header class="ledger-head"><h2>Rent lines</h2><span>last 4 months</span></header>${lines}</section>`:''}`;
 }
 function flap(text:string,cls=''):string{
-  return `<span class="flap ${cls}" aria-label="${escapeHtml(text)}">${[...text].map((ch,i)=>`<i style="--d:${i*45}ms" aria-hidden="true">${ch===' '?'&nbsp;':escapeHtml(ch)}</i>`).join('')}</span>`;
+  return `<span class="flap ${cls}">${escapeHtml(text)}</span>`;
 }
 function monthHero(p:Portfolio,evidence:Record<string,TransferEvidence[]>):string{
   const snap=monthSnapshot(p,workspaceMonth,'',evidence);
   const pct=snap.expectedLuna?Math.min(100,Math.round(snap.paidLuna/snap.expectedLuna*100)):0;
   const late=snap.lines.filter(l=>chargeRailState(p,l.charge,evidence)==='late').length;
-  return `<section class="hero-split reveal" aria-label="This month">
-    <div class="hero-copy"><span class="pill-tag">${escapeHtml(monthLabel(workspaceMonth))}</span>
-      <h1 class="display">${formatNim(snap.paidLuna)}<small> / ${formatNim(snap.expectedLuna)} NIM</small></h1>
-      <p class="lede">collected on Nimiq mainnet this month.</p>
-      <div class="hero-stats"><span><b>${snap.paidCount}</b>paid</span><span><b>${snap.charges-snap.paidCount}</b>open</span><span class="${late?'is-late':''}"><b>${late}</b>late</span></div>
-    </div>
-    <div class="gauge" style="--pct:${pct}"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52"/><circle class="gauge-fill" cx="60" cy="60" r="52" pathLength="100"/></svg><span><b>${pct}%</b><small>collected</small></span></div>
+  return `<section class="book-cover reveal" aria-label="This month">
+    <div class="cover-head"><span class="cover-kicker">Rent book</span><span class="cover-month">${escapeHtml(monthLabel(workspaceMonth))}</span></div>
+    <h1 class="cover-total"><span class="riso">${formatNim(snap.paidLuna)}</span><small>of ${formatNim(snap.expectedLuna)} NIM collected</small></h1>
+    <div class="tally" aria-hidden="true"><span style="width:${pct}%"></span></div>
+    <div class="cover-stats"><span><b>${snap.paidCount}</b> paid</span><span><b>${snap.charges-snap.paidCount}</b> open</span><span class="${late?'is-late':''}"><b>${late}</b> late</span><span><b>${pct}%</b> in</span></div>
+    ${pct===100&&snap.charges?stamp('ALL IN','paid',shortMonth(workspaceMonth).toUpperCase()):''}
     ${preview?'':`<div class="hero-sync">${syncBar()}</div>`}
   </section>`;
 }
@@ -399,11 +404,11 @@ function overview(p: Portfolio): string {
   const evidence=proofEvidence(p);
   const empty=!p.units.length;
   if(empty&&!preview)return `<section class="landing hero-landing reveal">
-      <div class="landing-copy"><span class="pill-tag">Nimiq Pay mini app</span><h1 class="display">Rent that<br/>arrives <em>on time.</em></h1><p class="lede">Sign a lease once with your Nimiq Pay wallet. Every month your tenant pays in one tap, and the payment pulls into your ledger on Nimiq mainnet.</p>
+      <div class="landing-copy"><span class="pill-tag">A Nimiq Pay mini app</span><h1 class="display">The rent book,<br/><em>on-chain.</em></h1><p class="lede">Sign a lease once with your Nimiq Pay wallet. Every month your tenant pays in one tap, and the payment pulls into your ledger on Nimiq mainnet.</p>
       <div class="landing-ctas"><button id="preview-demo" class="primary" type="button">See it with sample units ${icon('arrow')}</button><button class="ghost" type="button" data-audience="tenant">I pay rent</button></div></div>
       <div class="landing-art" aria-hidden="true">
-        <div class="mini-ticket"><div class="ticket-top"><span class="ticket-brand">RentRail</span><span class="ticket-kind">RENT TICKET</span></div><div class="mt-route"><span>YOU</span><i></i><span>MAPLE · 2B</span></div><div class="mt-fare"><small>FARE</small><b>1250<em> NIM</em></b></div><div class="stamp small">PAID</div></div>
-        <div class="mini-board">${['ARRIVED','ARRIVED','EXPECTED'].map((st,i)=>`<div class="mb-row"><span>0${i+1} NOV</span><span>APT ${101+i}</span>${flap(st,i<2?'fl-paid':'fl-due')}</div>`).join('')}</div>
+        <div class="mini-ticket"><div class="ticket-top"><span class="ticket-brand">RentRail</span><span class="ticket-kind">RENT RECEIPT</span></div><div class="mt-route"><span>YOU</span><i></i><span>MAPLE · 2B</span></div><div class="mt-fare"><small>FARE</small><b>1250<em> NIM</em></b></div><div class="stamp small">PAID</div></div>
+        <div class="mini-lines">${[['101','#FF5B1F',['paid','paid','paid','paid']],['102','#2433A0',['paid','paid','paid','late']],['S3','#00A99D',['paid','paid','paid','partial']]].map(([b,c,st])=>`<div class="line-row"><span class="bullet" style="--line:${c}">${b}</span>${rentRail((st as string[]).map((x,i)=>({period:addMonths(currentPeriod(),i-3),state:x as RailState})),true,c as string)}</div>`).join('')}</div>
       </div>
     </section>
     ${identityPanel()}
@@ -733,7 +738,7 @@ function tenantView(request:SharedRequest):string {
   return `<div class="checkout pay-sheet">
   <div class="ticket-wrap reveal"><article class="ticket ${trust.level} ${paid?'is-paid':''}" aria-label="Rent ticket">
     <div class="ticket-main">
-      <div class="ticket-top"><span class="ticket-brand"><span class="brand-symbol">R<span>·</span></span>RentRail</span><span class="ticket-kind">RENT TICKET</span></div>
+      <div class="ticket-top"><span class="ticket-brand"><span class="brand-symbol">R<span>·</span></span>RentRail</span><span class="ticket-kind">Rent receipt</span></div>
       <div class="route">
         <div class="stop"><small>FROM</small><span class="you-dot">${tenantMemory.wallet?identiconImg(tenantMemory.wallet,40):icon('wallet')}</span><strong>You</strong></div>
         <div class="route-line" aria-hidden="true"><span class="train"></span></div>
@@ -750,7 +755,8 @@ function tenantView(request:SharedRequest):string {
       <div><small>TICKET NO.</small><b class="mono">${escapeHtml(request.memo.slice(4,12).toUpperCase())}·${escapeHtml(m)}</b></div>
       <span class="trust-chip ${trust.level}">${trust.level==='signed'?`${icon('shield')} Validated · landlord signature`:trust.level==='unsigned'?`${icon('alert')} Not signed`:`${icon('alert')} Modified · do not pay`}</span>
     </div>
-    ${paid?'<div class="stamp" aria-label="Paid">PAID<small>NIMIQ MAINNET</small></div>':''}
+    <span class="punch" aria-hidden="true"></span>
+    ${paid?`<div class="stamp" aria-label="Paid">PAID<small>${escapeHtml(new Date().toLocaleDateString('en',{day:'2-digit',month:'short'}).toUpperCase())} · NIMIQ</small></div>`:''}
   </article></div>
   ${rail?`<div class="sheet-rail reveal">${rail}</div>`:''}
   <div class="checkout-card reveal">
