@@ -333,7 +333,7 @@ function collectionsView(p:Portfolio):string {
     <button id="download-collections" type="button" class="tertiary" ${!report.lines.length?'disabled':''}>Export local collections CSV</button>
   </section>
   <section class="panel"><h3>Unit-level due days</h3><p class="form-hint">Choose day 1–28 of each month. Saved only in this browser, never written to the blockchain.</p>
-    <div class="collection-due-grid">${units.map(u=>`<label class="collection-due-row"><span>${escapeHtml(p.properties.find(q=>q.id===u.propertyId)?.name||'')} · ${escapeHtml(u.label)}</span><select data-due-unit="${escapeHtml(u.id)}">${Array.from({length:28},(_,i)=>i+1).map(day=>`<option value="${day}" ${(dueDays[u.id]??1)===day?'selected':''}>${day}</option>`).join('')}</select></label>`).join('')||'<p>Add a property and unit to configure recurring due days.</p>'}</div>
+    <div class="collection-due-grid">${units.map(u=>`<label class="collection-due-row"><span>${escapeHtml(p.properties.find(q=>q.id===u.propertyId)?.name||'')} · ${escapeHtml(u.label)}</span><select data-due-unit="${escapeHtml(u.id)}" ${preview?'disabled':''}>${Array.from({length:28},(_,i)=>i+1).map(day=>`<option value="${day}" ${(dueDays[u.id]??1)===day?'selected':''}>${day}</option>`).join('')}</select></label>`).join('')||'<p>Add a property and unit to configure recurring due days.</p>'}</div>
   </section>
   <section class="panel"><div class="section-heading"><h2>Review and follow up</h2><span class="count">${report.lines.length} local requests</span></div>
     <div class="collection-list">${rows||'<p class="form-hint">No charges in this property. Create a monthly obligation to begin.</p>'}</div>
