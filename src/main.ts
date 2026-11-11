@@ -1,5 +1,6 @@
 import './styles.css';
 import {compareIndependentRecipient} from './recipient-crosscheck.ts';
+import {illustrateRentNim} from './fiat-context.ts';
 import {addSavedHash,parseSavedHashes,removeSavedHash,MAX_SAVED_HASHES,type SavedHashReference} from './saved-hash-review.ts';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { journeySteps,validAudience,parseManualPaymentReview,describeManualProof,statusExplanations,type Audience,type ManualPaymentReviewFields } from './journey.ts';
@@ -363,6 +364,19 @@ function collectionsView(p:Portfolio):string {
   ${savedPanel}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Human review, not automated collection.</strong><p>All reminders are drafts. RentRail does not send messages, charge late fees, debit a wallet or report tenants as delinquent.</p></div></div>`;
 }
+function fiatContextPanel():string {
+  return `<section class="panel" aria-label="Illustrative local currency rent estimate">
+    <h3>Understand the NIM equivalent</h3>
+    <p class="form-hint">Most rent is expressed in local currency. Try a manual scenario to estimate its NIM equivalent. RentRail does not fetch or guarantee exchange rates, lock prices, or initiate payments.</p>
+    <form id="fiat-context-form" class="form-stack">
+      <label>Local currency<select name="currency"><option value="CAD">CAD</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="NGN">NGN</option></select></label>
+      <div class="form-duo"><label>Rent amount in that currency<input name="rentFiat" inputmode="decimal" maxlength="18" placeholder="1200.00" required/></label>
+      <label>Manual reference price: currency units per 1 NIM<input name="fiatPerNim" inputmode="decimal" maxlength="24" placeholder="0.00123456" required/></label></div>
+      <button class="tertiary" type="submit">Calculate illustration only</button>
+    </form>
+    <p id="fiat-context-result" class="inline-alert" role="status">Example only. Verify a current rate independently. Any real payment amount must be confirmed in the Nimiq wallet.</p>
+  </section>`;
+}
 function chargesView(p:Portfolio):string {
   return `<div class="page-title"><div><div class="eyebrow">RENT LEDGER</div><h1>Monthly <em>rent requests.</em></h1><p>Create a request for a specific unit and month, then review payment evidence separately.</p></div></div>
   <div class="two-col"><section class="panel"><h3>Create a rent request</h3><form id="charge-form" class="form-stack">
@@ -373,6 +387,7 @@ function chargesView(p:Portfolio):string {
     <button class="primary" type="submit" ${preview||!p.units.length?'disabled':''}>${icon('plus')} Create obligation</button>
   </form></section><section class="stack"><div class="section-heading"><h2>Rent requests</h2><span class="count">${p.charges.length}</span></div>${p.charges.length?p.charges.slice().reverse().map(c=>chargeRow(p,c)).join(''):emptyState('No obligations recorded','Create a property and a unit before issuing a request.','properties','Set up property')}</section></div>
   ${renewalPlanner(p)}
+  ${fiatContextPanel()}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Sending is not settlement.</strong><p>All requests start OPEN. Any wallet-submitted hash remains unverified until independent chain verification is implemented.</p></div></div>`;
 }
 function walletInventoryPanel():string {
@@ -628,6 +643,16 @@ function bindEvents():void {
   propertyForm?.addEventListener('submit',e=>{e.preventDefault();try{safePersist(addProperty(portfolio,{id:randomId(),name:formValue(propertyForm,'name'),createdAt:new Date().toISOString()}));success('Property added locally.');}catch(err){error(explainHostError(err));}});
   const unitForm=root!.querySelector<HTMLFormElement>('#unit-form');
   unitForm?.addEventListener('submit',e=>{e.preventDefault();try{safePersist(addUnit(portfolio,{id:randomId(),propertyId:formValue(unitForm,'propertyId'),label:formValue(unitForm,'label')}));success('Unit added locally.');}catch(err){error(explainHostError(err));}});
+  const fiatContextForm=root!.querySelector<HTMLFormElement>('#fiat-context-form');
+  fiatContextForm?.addEventListener('submit',e=>{
+    e.preventDefault();
+    const target=root!.querySelector<HTMLElement>('#fiat-context-result');
+    if(!target)return;
+    try{
+      const amount=illustrateRentNim(formValue(fiatContextForm,'currency'),formValue(fiatContextForm,'rentFiat'),formValue(fiatContextForm,'fiatPerNim'));
+      target.textContent=`Illustration: ${amount.rentFiat} ${amount.currency} / ${amount.fiatPerNim} ${amount.currency} per NIM = about ${amount.estimatedNim} NIM (${amount.estimatedLuna} Luna). ${amount.disclaimer}`;
+    }catch(err){target.textContent=err instanceof Error?err.message:'Invalid manual price or rent amount.';}
+  });
   const chargeForm=root!.querySelector<HTMLFormElement>('#charge-form');
   chargeForm?.addEventListener('submit',e=>{e.preventDefault();try{
     const id=randomId(); const charge:Charge={id,unitId:formValue(chargeForm,'unitId'),period:formValue(chargeForm,'period'),amountLuna:parseNim(formValue(chargeForm,'amount')),recipient:formValue(chargeForm,'recipient'),memo:makeMemo(id),createdAt:new Date().toISOString()};
