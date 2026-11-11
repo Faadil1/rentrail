@@ -1,5 +1,6 @@
 import './styles.css';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
+import { journeySteps,validAudience,parseManualPaymentReview,statusExplanations,type Audience,type ManualPaymentReviewFields } from './journey.ts';
 import { collectionQueue,collectionCsv,reminderDraft,validDueDay,type DueDays } from './collections.ts';
 import { assessSmokePayment, SMOKE_MAX_LUNA, type SmokeAssessment } from './smoke-gate.ts';
 import { isValidNimiqAddress } from './address-validation.ts';
@@ -22,6 +23,17 @@ if (!root) throw new Error('Missing application mount element.');
 let portfolio: Portfolio = loadPortfolio();
 let preview = false;
 let selectedView: View = 'overview';
+const AUDIENCE_KEY='rentrail-workflow-preference-v1';
+function storedAudience():Audience {
+  try {const v=localStorage.getItem(AUDIENCE_KEY);return validAudience(v)?v:'explorer';}
+  catch{return 'explorer';}
+}
+let audience:Audience=storedAudience();
+let manualReviewFields:ManualPaymentReviewFields={hash:'',recipient:'',memo:'',amountNim:''};
+let manualReviewBusy=false;
+let manualReviewResult:VerifyResult|null=null;
+let manualReviewMessage='';
+
 let workspaceMonth = currentPeriod();
 let collectionsPropertyFilter='';
 function localDay():string {
@@ -176,11 +188,54 @@ function walletIndicator(): string {
   const description = hostStatus==='connected' ? (check?.consensus ? 'SDK connected' : 'SDK / no consensus') : hostStatus==='checking' ? 'Checking host…' : 'Host not verified';
   return `<div class="wallet-state"><span class="status-light ${hostStatus==='connected'&&check?.consensus?'online':''}"></span><span>${escapeHtml(description)}</span></div>`;
 }
+function audienceNavigation():string{
+  const tabs:[
+    {id:Audience,label:string,detail:string}
+  ]=[
+    {id:'owner',label:'I manage rentals',detail:'Prepare monthly rent and follow up'},
+    {id:'tenant',label:'I pay rent',detail:'Understand a request and check my transfer'},
+    {id:'explorer',label:'Show me RentRail',detail:'Try a fictional workspace safely'}
+  ];
+  return `<div class="journey-audiences" role="group" aria-label="Choose what you want to do">${tabs.map(t=>
+    `<button class="journey-audience ${audience===t.id?'active':''}" data-audience="${t.id}" type="button" aria-pressed="${audience===t.id}"><strong>${escapeHtml(t.label)}</strong><span>${escapeHtml(t.detail)}</span></button>`).join('')}</div>`;
+}
+function statusGuide():string{
+  return `<section class="status-guide section" aria-label="How to interpret a rent payment">
+    <div class="section-heading"><div><div class="eyebrow">NO CONFUSING PAYMENT STATUS</div><h2>What does each payment status mean?</h2></div></div>
+    <div class="status-guide-grid">${statusExplanations.map((state,i)=>`<article class="status-stage">
+      <span class="status-stage-index">${i+1}</span><h3>${escapeHtml(state.title)}</h3><p>${escapeHtml(state.description)}</p></article>`).join('')}</div>
+    <p class="form-hint">RentRail can check public blockchain evidence; it cannot decide whether a legal rental debt has been discharged or verify a landlord's real-world identity.</p>
+  </section>`;
+}
+function guidedJourney(p:Portfolio):string{
+  const verified=Object.values(observedProofs).some(proofs=>proofs.some(x=>x.status==='FINAL_VERIFIED'));
+  const steps=journeySteps(audience,preview?emptyPortfolio():p,verified);
+  const headline=audience==='owner'?'Manage every rent month, not just transfers.':audience==='tenant'?'Know exactly what you were asked to pay.':'See how RentRail makes rent traceable.';
+  const explainer=audience==='owner'
+    ?'Organize units, create monthly requests, follow due dates and reconcile existing payments.'
+    :audience==='tenant'
+      ?'Review a rent request, double-check the recipient independently and look up an existing payment. No account is created here.'
+      :'Walk through a fictional rental portfolio. No money moves, and no real landlord or tenant data is needed.';
+  return `<section class="journey-shell" aria-label="Choose your RentRail pathway">
+    <div class="journey-head"><div><div class="eyebrow">RENT PAYMENTS · SIMPLE TO FOLLOW</div><h2>${escapeHtml(headline)}</h2><p>${escapeHtml(explainer)}</p></div><span class="journey-pill">NIMIQ PAY · NO CUSTODY</span></div>
+    ${audienceNavigation()}
+    <ol class="journey-steps">${steps.map((step,i)=>`<li class="journey-step">
+      <span class="journey-number">${i+1}</span>
+      <div class="journey-step-copy"><strong>${escapeHtml(step.title)}</strong><p>${escapeHtml(step.description)}</p>
+      <small>${step.state==='LOCAL_DONE'?'Local setup complete — not proof of rent paid':step.state==='GUIDANCE_ONLY'?'Safety guidance':step.state==='READY'?'Next step':''}</small></div>
+      <button class="journey-step-action" type="button" data-journey="${i}">${escapeHtml(step.label)} ${icon('arrow')}</button>
+      </li>`).join('')}</ol>
+    ${audience==='tenant'?'<div id="tenant-help" class="tenant-help"><strong>Important for tenants</strong><p>RentRail cannot look up private rent obligations for you. Ask your landlord to share your request link. Check the recipient through a separate trusted conversation; the NQ checksum only detects typos. If you have already transferred NIM, use “Verify my transaction” to read a public blockchain node. The public RentRail demo does not initiate a payment.</p></div>':''}
+  </section>`;
+}
 function overview(p: Portfolio): string {
   const sum = p.charges.reduce((n,c)=>n+c.amountLuna,0);
   const submitted = p.charges.filter(c=>p.submissions.some(s=>s.chargeId===c.id)).length;
   const chargeCards = p.charges.slice().reverse().slice(0,6).map(c=>chargeRow(p,c)).join('');
-  return `<div class="welcome"><div><div class="eyebrow">RENTAL OPERATIONS · NIMIQ PAY</div><h1>Your portfolio, <em>in focus.</em></h1><p>Every rent period tracked. Every payment outcome explained. Built for one property or many.</p></div><div class="welcome-symbol">${icon('layers')}</div></div>
+  const opener=`<div class="welcome"><div><div class="eyebrow">RENTAL OPERATIONS · NIMIQ PAY</div><h1>Know which rent. <em>Know which payment.</em></h1><p>One place to prepare rental obligations, track monthly follow-ups and independently check transfers already made.</p></div><div class="welcome-symbol">${icon('layers')}</div></div>
+    ${guidedJourney(p)}`;
+  if(audience==='tenant')return opener+statusGuide()+`<div class="safety"><span>${icon('shield')}</span><div><strong>No wallet payments from this preview.</strong><p>RentRail does not hold funds or prove who owns a receiving wallet.</p></div></div>`;
+  return `${opener}
     <div class="metric-grid">
       <div class="metric"><div class="metric-top"><span>Total obligations</span>${icon('receipt')}</div><strong>${formatNim(sum)} <small>NIM</small></strong><span class="metric-foot">Recorded locally · not an on-chain balance</span></div>
       <div class="metric"><div class="metric-top"><span>Active units</span>${icon('home')}</div><strong>${p.units.length}</strong><span class="metric-foot">Across ${p.properties.length} properties</span></div>
@@ -191,6 +246,7 @@ function overview(p: Portfolio): string {
     <section class="section"><div class="section-heading"><div><div class="eyebrow">YOUR WORKSPACE</div><h2>Recent obligations</h2></div><button class="tertiary" data-nav="charges">View all ${icon('arrow')}</button></div>
       ${chargeCards || emptyState('No rent charges yet','Create a property and unit, then issue your first monthly rent request.','properties','Create a property')}
     </section>
+    ${statusGuide()}
     <div class="safety"><span>${icon('shield')}</span><div><strong>Designed to show what is proven.</strong><p>Sending a transaction never marks an obligation as paid. Independent mainnet reconciliation is a separate required gate.</p></div></div>`;
 }
 function periodCockpit(p:Portfolio):string {
