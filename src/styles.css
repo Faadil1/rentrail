@@ -610,3 +610,79 @@ button:disabled{opacity:.4}
 .mobile-brand .brand-symbol.stub-mark{width:32px;height:32px}
 .ticket-brand .brand-symbol.stub-mark{width:28px;height:28px}
 .mobile-brand small,.brand{font-size:26px;letter-spacing:-.01em}
+
+/* ================= v5 · pure rent book (two inks only) ================= */
+:root{--teal:var(--blue);--yellow:var(--orange)}
+.tag.green{color:var(--blue)}.tag.amber,.tag.red{color:var(--orange)}
+.sig-badge,.ok-alert,.trust-line.ok,.trust-banner.signed,.pay-success strong,.verify-result.ok strong,.pay-step.done{color:var(--blue) !important;border-color:var(--blue)}
+.pay-success{border-color:var(--blue)}
+.status-light.online{background:var(--blue)}
+.feed b{color:var(--blue)}
+/* stamps: orange ink only, blue pen glyph beside */
+.stamp-cell{display:inline-flex;align-items:center;gap:8px}
+.stamp-mark,.sm-paid,.sm-late,.sm-part,.sm-due{color:var(--orange)}
+.sm-due{color:var(--blue)}
+.st-glyph{font-style:normal;color:var(--blue);font-size:18px;font-weight:700;line-height:1}
+.st-glyph.bar{width:22px;height:8px;border:1.5px solid var(--blue);border-radius:2px;background:linear-gradient(90deg,var(--blue) 55%,transparent 55%)}
+/* ledger: full grid, blank ruled rows, spiral holes */
+.ledger-page{position:relative;padding:18px 34px 14px 16px;border-radius:2px}
+.spiral{position:absolute;right:8px;top:14px;bottom:14px;width:14px;background:radial-gradient(circle,var(--paper2) 4px,rgba(36,51,160,.35) 5px,transparent 6px) 0 0/14px 26px repeat-y}
+.ledger-head{border-bottom:0;padding:0 0 8px}
+.ledger-head h2{font-size:clamp(28px,7vw,38px)}
+.ledger{border:1.5px solid var(--blue)}
+.ledger th{border-bottom:1.5px solid var(--blue);border-right:1px solid var(--blue);font-size:10px;padding:7px 6px}
+.ledger th:last-child{border-right:0}
+.ledger td{border-bottom:1px solid var(--rule);border-right:1px solid var(--blue);padding:9px 6px;font-family:'Courier Prime',monospace;font-size:13px;color:var(--ink)}
+.ledger td:last-child{border-right:0}
+.ledger td:first-child{display:table-cell}
+.ledger td strong{font-family:'Courier Prime',monospace;font-weight:700;font-size:13px;color:var(--ink)}
+.ledger td+td{border-left:0}
+.l-tenant{white-space:nowrap}.l-tenant .identicon{vertical-align:middle;margin-right:4px}.l-tenant .mono{font-size:11px;color:var(--sub)}
+.ledger tr.blank td{height:30px}
+.l-st{text-align:left !important}
+/* month strip */
+.months{list-style:none;display:flex;margin:12px 0 0;padding:0;border:1.5px solid var(--blue)}
+.months li{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 4px;border-right:1.5px solid var(--blue);font-family:'Archivo Variable';font-stretch:68%;font-weight:800;font-size:18px;color:var(--blue)}
+.months li:last-child{border-right:0}
+.months li b{display:inline-flex;width:20px;height:20px;border:1.5px solid var(--blue);align-items:center;justify-content:center;font-size:14px;line-height:1;font-family:'Courier Prime',monospace}
+.months .m-late,.months .m-review{color:var(--orange)}.months .m-late b,.months .m-review b{border-color:var(--orange)}
+.months .m-due{background:rgba(36,51,160,.06)}
+.months .m-none{color:var(--mute)}.months .m-none b{border-style:dotted;border-color:var(--mute)}
+.months.compact li{font-size:14px;padding:5px 2px}.months.compact li b{width:16px;height:16px;font-size:11px}
+.sheet-rail .months{background:var(--card)}
+/* rent slip (tenant) */
+.rent-slip{position:relative;background:var(--card);border:1.5px solid var(--rule);box-shadow:4px 4px 0 var(--rule2);padding:20px 20px 16px;margin-bottom:16px;border-radius:2px}
+.animate .rent-slip{animation:printOut 1s var(--ease) both}
+.rent-slip.tampered{background:#FFEDE5}
+.slip-head{border-bottom:3px double var(--blue);padding-bottom:10px}
+.slip-head h1{margin:0;font-size:clamp(40px,11vw,56px);line-height:.95;text-shadow:2px 1.5px 0 rgba(255,91,31,.35)}
+.slip-landlord{font-family:'Courier Prime',monospace;font-size:14px;color:var(--ink);text-align:center;border-bottom:1.5px solid var(--blue);padding:10px 0;margin:0}
+.slip-amount{text-align:center;font-family:'Courier Prime',monospace;font-weight:700;font-size:clamp(46px,13vw,64px);color:var(--orange);letter-spacing:-.02em;margin:18px 0 4px;line-height:1;text-shadow:-1.5px 1px 0 rgba(36,51,160,.25)}
+.slip-amount span{font-size:.62em}
+.slip-due{text-align:center;font-family:'Courier Prime',monospace;font-size:15px;color:var(--blue);margin:0 0 18px}.slip-due.is-late{color:var(--orange);font-weight:700}
+.slip-stub{position:relative;margin:0 -28px;padding:14px 28px 16px;background:var(--card);border-top:2px dashed var(--blue);border-bottom:2px dashed var(--blue);transform:rotate(-1deg);box-shadow:0 6px 14px rgba(29,38,113,.08)}
+.slip-stub::before,.slip-stub::after{content:'';position:absolute;top:0;bottom:0;width:10px;background:radial-gradient(circle at 0 50%,var(--paper) 5px,transparent 5.5px) 0 0/10px 14px repeat-y}
+.slip-stub::before{left:0}.slip-stub::after{right:0;transform:scaleX(-1)}
+.stub-row{display:flex;justify-content:space-between;align-items:center;font-family:'Courier Prime',monospace;font-size:14px;color:var(--ink);border-bottom:1.5px dotted var(--blue);padding-bottom:8px;margin-bottom:10px}
+.slip-stub .pay-zone{position:static;background:none;padding:0;margin:0}
+.slip-stub .pay-button{background:var(--blue);color:var(--paper);box-shadow:none;border-radius:999px;font-family:'Archivo Variable';font-stretch:72%;font-size:20px;font-weight:800;filter:url(#none)}
+.slip-stub .pay-button{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cfilter id='g'%3E%3CfeTurbulence baseFrequency='1.2' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='120' height='60' filter='url(%23g)'/%3E%3C/svg%3E")}
+.slip-stub .pay-note{font-size:11px;margin-top:8px}
+.rent-slip .stamp{top:auto;bottom:6px;right:4px;width:104px;height:104px;font-size:30px}
+.slip-sign{display:flex;flex-direction:column;align-items:flex-end;margin-top:16px;gap:2px}
+.sig-label{font-family:'Courier Prime',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);border-top:1.5px solid var(--blue);padding-top:4px;min-width:180px;text-align:right}
+.sig-label.warn,.sig-label.bad{color:var(--orange);border-color:var(--orange)}
+.slip-sign small{font-size:10px;font-family:'Courier Prime',monospace}
+.scribble{width:170px;height:40px;margin-top:-50px;margin-right:6px}
+.scribble path{fill:none;stroke:var(--blue);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:600;stroke-dashoffset:0}
+.animate .scribble path{animation:sign 1.8s var(--ease) both .6s}
+@keyframes sign{from{stroke-dashoffset:600}}
+.slip-sign{padding-top:46px}
+/* landing mini ledger */
+.mini-ledger{position:absolute;left:0;bottom:0;width:min(320px,92%);transform:rotate(2.5deg);background:var(--card);border:1.5px solid var(--blue);padding:10px 12px;box-shadow:5px 5px 0 var(--rule2)}
+.ml-head{font-family:'Archivo Variable';font-stretch:68%;font-weight:900;font-size:20px;color:var(--blue);border-bottom:1.5px solid var(--blue);padding-bottom:6px;margin-bottom:4px}
+.ml-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;font-family:'Courier Prime',monospace;font-size:13px;color:var(--ink);padding:7px 0;border-bottom:1px solid var(--rule)}.ml-row:last-child{border:0}
+.mt-route i{background:var(--blue);height:2px;border-radius:0;background:repeating-linear-gradient(90deg,var(--blue) 0 6px,transparent 6px 10px)}
+.landing-art .stamp.small{color:var(--orange);border-color:var(--orange)}
+@media(max-width:768px){.ledger-page{padding:14px 26px 12px 10px}.ledger th,.ledger td{padding:7px 4px}.l-tenant .mono{display:none}.months li{font-size:15px;gap:4px}.months li b{width:16px;height:16px}}
+.slip-sign{padding-top:6px}.scribble{margin:0 10px -6px 0}
