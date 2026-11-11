@@ -15,5 +15,5 @@ test('rejects an invalid request NQ address',()=>{
  assert.equal(compareIndependentRecipient('NQ00 INVALID',address).state,'INVALID');
 });
 test('different syntactically plausible recipients never return MATCH',()=>{
- assert.notEqual(compareIndependentRecipient(address,'NQ48 HR14 MN5P GHYP YTL4 E2PN SHYK 35UA E1QT').state,'MATCH');
+ assert.notEqual(compareIndependentRecipient(address,'NQ21 1111 1111 1111 1111 1111 1111 1111 1111').state,'MATCH');
 });
