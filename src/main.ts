@@ -1,5 +1,6 @@
 import './styles.css';
 import {compareIndependentRecipient} from './recipient-crosscheck.ts';
+import {addSavedHash,parseSavedHashes,removeSavedHash,MAX_SAVED_HASHES,type SavedHashReference} from './saved-hash-review.ts';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { journeySteps,validAudience,parseManualPaymentReview,describeManualProof,statusExplanations,type Audience,type ManualPaymentReviewFields } from './journey.ts';
 import { collectionQueue,collectionCsv,reminderDraft,validDueDay,type DueDays } from './collections.ts';
@@ -54,6 +55,18 @@ function readDueDays():DueDays {
 let dueDays=readDueDays();
 // Ephemeral observations: never persisted as settled rent and never trusted after reload.
 let observedProofs:Record<string,TransferEvidence[]>={};
+const SAVED_HASH_KEY='rentrail-hashes-to-recheck-v1';
+function loadSavedHashRefs():SavedHashReference[]{
+  try{return parseSavedHashes(localStorage.getItem(SAVED_HASH_KEY),new Set(portfolio.charges.map(c=>c.id)));}
+  catch{return [];}
+}
+let savedHashRefs=loadSavedHashRefs();
+let recheckBusy=false;
+let recheckMessage='';
+function persistSavedHashRefs(next:SavedHashReference[]):void {
+  localStorage.setItem(SAVED_HASH_KEY,JSON.stringify(next)); // Storage failure must not imply success.
+  savedHashRefs=next;
+}
 let filterProperty = '';
 let nextPeriodPreview: {period:string; count:number; skipped:number; next:string}|null=null;
 let publicAudit: PublicPaymentAudit | null = null;
@@ -316,6 +329,13 @@ function collectionsView(p:Portfolio):string {
   const report=collectionQueue(p,today,dueDays,filter,observedProofs);
   const units=p.units.filter(u=>!filter||u.propertyId===filter);
   const optionProperties=p.properties.map(x=>`<option value="${escapeHtml(x.id)}" ${x.id===filter?'selected':''}>${escapeHtml(x.name)}</option>`).join('');
+  const savedRows=preview?[]:savedHashRefs.filter(x=>p.charges.some(c=>c.id===x.chargeId));
+  const savedPanel=`<section class="panel" aria-label="Saved read-only transaction rechecks"><h2>Recheck saved transactions</h2>
+    <p class="form-hint">Save the public hash of an already-verified transfer and recheck its blockchain data after reopening this browser. These are local references only, not payment receipts or an authenticated shared ledger. Up to ${MAX_SAVED_HASHES} hashes; no wallet sending.</p>
+    <div class="collection-list">${savedRows.map(x=>{const c=p.charges.find(y=>y.id===x.chargeId);return `<div class="collection-row"><div><strong>${escapeHtml(c?.period||'Unknown period')}</strong><small>Hash ${escapeHtml(x.hash.slice(0,12))}… · saved ${escapeHtml(x.addedAt.slice(0,10))}</small></div><button type="button" class="tertiary" data-forget-hash="${escapeHtml(x.hash)}">Forget locally</button></div>`;}).join('')||'<p class="form-hint">No transaction references saved yet. Verify a real existing transfer under Check payment, then choose Save for later review.</p>'}</div>
+    <button id="recheck-saved-hashes" type="button" class="primary" ${preview||!savedRows.length||recheckBusy?'disabled':''}>${recheckBusy?'Rechecking…':'Recheck saved hashes against mainnet'}</button>
+    ${recheckMessage?`<p class="inline-alert" role="status">${escapeHtml(recheckMessage)}</p>`:''}
+  </section>`;
   const rows=report.lines.map(x=>`<article class="collection-row">
     <div><strong>${escapeHtml(x.unitLabel)}</strong><small>${escapeHtml(x.propertyName)} · ${escapeHtml(x.period)} · Due ${escapeHtml(x.dueDate)}</small></div>
     <div><strong>${formatNim(x.outstandingLuna)} NIM</strong><small>${escapeHtml(x.ageBucket)} · ${x.state==='NODE_MATCH_THIS_SESSION'?'Single-node match observed this session; recheck later':x.state==='NODE_REVIEW_REQUIRED'?'Node mismatch requires review':x.state==='TX_NEEDS_VERIFICATION'?'Wallet hash pending proof':'No verified settlement evidence'}</small></div>
@@ -340,6 +360,7 @@ function collectionsView(p:Portfolio):string {
   <section class="panel"><div class="section-heading"><h2>Review and follow up</h2><span class="count">${report.lines.length} local requests</span></div>
     <div class="collection-list">${rows||'<p class="form-hint">No charges in this property. Create a monthly obligation to begin.</p>'}</div>
   </section>
+  ${savedPanel}
   <div class="safety"><span>${icon('shield')}</span><div><strong>Human review, not automated collection.</strong><p>All reminders are drafts. RentRail does not send messages, charge late fees, debit a wallet or report tenants as delinquent.</p></div></div>`;
 }
 function chargesView(p:Portfolio):string {
@@ -433,6 +454,7 @@ function g3Panel(p:Portfolio):string {
     </form>
     ${!charges.length?'<div class="inline-alert">Create an actual local rent obligation before checking a transaction. Fictional example charges are never verified as real.</div>':''}
     ${txResult}
+    ${txVerifyResult?.state==='FINAL_MATCHED'&&txVerifiedChargeId===txChargeId&&!preview?`<button id="g3-save-hash" class="tertiary" type="button">Save this hash for later recheck on this device</button>`:''}
     ${txVerifiedChargeId===txChargeId && txVerifyResult && p.charges.some(x=>x.id===txChargeId)?observedTransferAmount(shareableRequest(p.charges.find(x=>x.id===txChargeId)!),txVerifyResult):''}
     ${txVerifyResult?.state==='FINAL_MATCHED' && txVerifiedChargeId===txChargeId?'<button id="g3-copy-audit" class="tertiary" type="button">Copy independent recheck link</button>':''}
     <div class="safety"><span>${icon('shield')}</span><div><strong>Payment sends remain locked.</strong><p>Nothing here sends NIM, stores wallet secrets, or marks rent paid automatically.</p></div></div>
@@ -699,6 +721,13 @@ function bindEvents():void {
   root!.querySelector('#audit-recheck')?.addEventListener('click',()=>void onAuditRecheck());
   root!.querySelector('#tenant-copy-audit')?.addEventListener('click',()=>void onCopyAudit('tenant'));
   root!.querySelector('#g3-copy-audit')?.addEventListener('click',()=>void onCopyAudit('owner'));
+  root!.querySelector('#g3-save-hash')?.addEventListener('click',()=>onSaveProofHash());
+  root!.querySelector('#recheck-saved-hashes')?.addEventListener('click',()=>void onRecheckSavedHashes());
+  root!.querySelectorAll<HTMLButtonElement>('[data-forget-hash]').forEach(b=>b.addEventListener('click',()=>{
+    if(preview||recheckBusy)return;
+    try{persistSavedHashRefs(removeSavedHash(savedHashRefs,b.dataset.forgetHash||''));recheckMessage='Reference forgotten on this device. Any old node match still needs a new recheck.';observedProofs={};render();}
+    catch{error('Browser storage did not accept this change.');}
+  }));
   root!.querySelector('#g3-network')?.addEventListener('click',()=>void onRpcCheck());
   const g3Form=root!.querySelector<HTMLFormElement>('#g3-verify-form');
   g3Form?.addEventListener('submit',e=>{e.preventDefault();void onVerifyG3(g3Form);});
@@ -781,6 +810,38 @@ async function onStandaloneVerify(form:HTMLFormElement):Promise<void>{
   try{manualReviewResult=await verifyNimTransaction(input);}
   catch{manualReviewMessage='The read-only node could not complete the check. No amount is credited.';}
   finally{manualReviewBusy=false;render();}
+}
+function onSaveProofHash():void {
+  if(preview||txVerifyResult?.state!=='FINAL_MATCHED'||txVerifiedChargeId!==txChargeId)return;
+  const charge=portfolio.charges.find(c=>c.id===txChargeId);
+  if(!charge)return;
+  try{
+    const next=addSavedHash(savedHashRefs,{chargeId:charge.id,hash:txVerifyResult.hash,addedAt:new Date().toISOString()},new Set(portfolio.charges.map(c=>c.id)));
+    persistSavedHashRefs(next);
+    success('Public transaction hash saved locally for future recheck. No rent settlement has been stored.');
+  }catch(err){error(err instanceof Error?err.message:'Could not save this reference.');}
+}
+async function onRecheckSavedHashes():Promise<void>{
+  if(preview||recheckBusy||!savedHashRefs.length)return;
+  recheckBusy=true;recheckMessage='';observedProofs={};render();
+  let matched=0,unresolved=0;
+  try{
+    for(const ref of savedHashRefs){
+      const charge=portfolio.charges.find(c=>c.id===ref.chargeId);
+      if(!charge){unresolved++;continue;}
+      try{
+        const result=await verifyNimTransaction({hash:ref.hash,recipient:charge.recipient,memo:charge.memo,amountLuna:charge.amountLuna,allowPartial:true});
+        if(result.state==='FINAL_MATCHED'&&typeof result.amountLuna==='number'&&Number.isSafeInteger(result.amountLuna)&&result.amountLuna>0){
+          const prior=observedProofs[charge.id]??[];
+          if(!prior.some(x=>x.hash===ref.hash)){
+            observedProofs={...observedProofs,[charge.id]:[...prior,{network:'nimiq-mainnet',hash:ref.hash,recipient:charge.recipient,memo:charge.memo,amountLuna:result.amountLuna,status:'FINAL_VERIFIED'}]};
+            matched++;
+          }else unresolved++;
+        }else unresolved++;
+      }catch{unresolved++;}
+    }
+    recheckMessage=`+'`'+'Rechecked ${matched+unresolved} saved hash(es): ${matched} node-reported match(es), ${unresolved} unresolved. Partial and overpaid totals require review. This session result is not a legal rent receipt.'+'`'+`;
+  }finally{recheckBusy=false;render();}
 }
 async function onVerifyG3(form:HTMLFormElement):Promise<void>{
   if(txVerifyBusy||preview)return;
