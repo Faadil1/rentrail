@@ -1,0 +1,71 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {emptyPortfolio,addProperty,addUnit,addCharge,makeMemo} from '../src/domain.ts';
+import {validAudience,journeySteps,parseManualPaymentReview,statusExplanations} from '../src/journey.ts';
+
+const addr='NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+const id='a'.repeat(32),hash='b'.repeat(64);
+function fields(){return {hash,recipient:addr,memo:makeMemo(id),amountNim:'0.005'};}
+test('audience selection is allowlisted, not account authentication',()=>{
+ assert.equal(validAudience('owner'),true);
+ assert.equal(validAudience('tenant'),true);
+ assert.equal(validAudience('explorer'),true);
+ assert.equal(validAudience('admin'),false);
+ assert.equal(validAudience({role:'owner'}),false);
+});
+test('owner journey shows five concrete product steps',()=>{
+ const j=journeySteps('owner',emptyPortfolio());
+ assert.equal(j.length,5);assert.equal(j[0].state,'READY');
+ assert.equal(j[3].view,'collections');assert.equal(j[4].view,'wallet');
+});
+test('local property, unit and charge steps indicate local setup only, never paid',()=>{
+ let p=emptyPortfolio();
+ p=addProperty(p,{id:'1'.repeat(32),name:'Cedar',createdAt:'2026-11-10T00:00:00Z'});
+ p=addUnit(p,{id:'2'.repeat(32),propertyId:'1'.repeat(32),label:'1B'});
+ p=addCharge(p,{id,unitId:'2'.repeat(32),period:'2026-11',amountLuna:500,recipient:addr,memo:makeMemo(id),createdAt:'2026-11-10T00:00:00Z'});
+ const j=journeySteps('owner',p);
+ assert.equal(j[0].state,'LOCAL_DONE');assert.equal(j[1].state,'LOCAL_DONE');assert.equal(j[2].state,'LOCAL_DONE');
+ assert.equal(j[4].state,'READY');
+ assert.equal(journeySteps('owner',p,true)[4].state,'LOCAL_DONE');
+});
+test('tenant is not falsely offered access to private landlord invoices',()=>{
+ const j=journeySteps('tenant',emptyPortfolio());
+ assert.equal(j[0].state,'GUIDANCE_ONLY');assert.equal(j[0].action,'instructions');
+ assert.ok(j.every(step=>step.description.includes('link')||step.description.includes('address')||step.description.includes('demo')||step.description.includes('hash')));
+});
+test('explorer can inspect fictional sample without payment',()=>{
+ const j=journeySteps('explorer',emptyPortfolio());assert.equal(j[0].action,'preview');
+ assert.equal(j[1].view,'collections');assert.equal(j[2].view,'wallet');
+});
+test('exact standalone proof lookup accepts valid NQ and 0.005 NIM',()=>{
+ const x=parseManualPaymentReview(fields());
+ assert.equal(x.amountLuna,500);assert.equal(x.recipient,addr);
+ assert.equal(x.memo,'RR1:'+id);assert.equal(x.hash,hash);
+ assert.equal(x.allowPartial,true);
+});
+test('standalone lookup trims hash and normalizes NQ case and whitespace',()=>{
+ const f=fields();f.hash=' '+hash.toUpperCase()+' ';f.recipient=addr.toLowerCase().replaceAll(' ','');
+ const v=parseManualPaymentReview(f);
+ assert.equal(v.recipient,addr);assert.equal(v.hash,hash);
+});
+test('nonhex hash rejected before any RPC read',()=>assert.throws(()=>parseManualPaymentReview({...fields(),hash:'z'.repeat(64)}),/64 hexadecimal/));
+test('short or blank hash rejected',()=>{
+ for(const x of ['','123',hash.slice(0,63)])assert.throws(()=>parseManualPaymentReview({...fields(),hash:x}),/64 hexadecimal/);
+});
+test('incorrect NQ checksum rejected before RPC read',()=>{
+ assert.throws(()=>parseManualPaymentReview({...fields(),recipient:'NQ01 1111 1111 1111 1111 1111 1111 1111 1111'}),/checksum/);
+});
+test('empty recipient rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),recipient:''}),/valid Nimiq/));
+test('wrong memo prefix rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),memo:'TX:'+id}),/RR1:/));
+test('wrong reference length rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),memo:'RR1:'+id.slice(0,30)}),/RR1:/));
+test('blank NIM rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),amountNim:''}),/positive/));
+test('too many decimal digits rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),amountNim:'0.000001'}),/five decimal/));
+test('zero or negative NIM rejected',()=>{
+ for(const amountNim of ['0','-1'])assert.throws(()=>parseManualPaymentReview({...fields(),amountNim}),/positive/);
+});
+test('large unsafe NIM values rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),amountNim:'9007199254740991'}),/safe integer/));
+test('glossary has four human-readable non-false states',()=>{
+ assert.equal(statusExplanations.length,4);
+ assert.match(statusExplanations[1].description,/alone does not confirm/);
+ assert.match(statusExplanations[2].description,/one public mainnet node/i);
+});
