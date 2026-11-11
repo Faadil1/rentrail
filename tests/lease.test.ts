@@ -17,6 +17,7 @@ test('a monthly request survives the link round trip and must match its lease', 
   const r = validateSharedRequest(JSON.parse(JSON.stringify(leaseRequest(lease, '2026-11'))));
   assert.ok(requestMatchesLease(r));
   assert.equal(requestMatchesLease({ ...r, amountLuna: 1 }), false);
+  assert.equal(requestMatchesLease({ ...r, title: 'Changed title' }), false);
   assert.equal(requestMatchesLease({ ...r, lease: { ...r.lease!, amountLuna: 1 } }), false);
 });
 
