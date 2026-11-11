@@ -66,7 +66,7 @@ function readDueDays():DueDays {
 let dueDays=readDueDays();
 
 // On-chain payment proofs for this device's ledger. Each one was matched on Nimiq
-// mainnet (recipient, amount, RR1 reference, execution, finality) before being stored.
+// mainnet (recipient, amount, STUB1 reference, execution, finality) before being stored.
 function loadProofs():StoredProof[]{
   try{return parseProofs(localStorage.getItem(PROOF_STORAGE_KEY));}catch{return [];}
 }
@@ -367,7 +367,7 @@ function audienceNavigation():string{
   const tabs: Array<{id:Audience,label:string,detail:string}> = [
     {id:'owner',label:'I manage rentals',detail:'Request rent and see who paid'},
     {id:'tenant',label:'I pay rent',detail:'Pay a request from my landlord'},
-    {id:'explorer',label:'Show me RentRail',detail:'Open a sample portfolio'}
+    {id:'explorer',label:'Show me Stub',detail:'Open a sample portfolio'}
   ];
   return `<div class="journey-audiences" role="group" aria-label="Choose what you want to do">${tabs.map(t=>
     `<button class="journey-audience ${audience===t.id?'active':''}" data-audience="${t.id}" type="button" aria-pressed="${audience===t.id}"><strong>${escapeHtml(t.label)}</strong><span>${escapeHtml(t.detail)}</span></button>`).join('')}</div>`;
@@ -382,13 +382,13 @@ function statusGuide():string{
 function guidedJourney(p:Portfolio):string{
   const verified=storedProofs.length>0;
   const steps=journeySteps(audience,preview?emptyPortfolio():p,verified);
-  const headline=audience==='owner'?'Collect rent in NIM, month after month.':audience==='tenant'?'Pay your rent in one tap.':'See RentRail in 30 seconds.';
+  const headline=audience==='owner'?'Collect rent in NIM, month after month.':audience==='tenant'?'Pay your rent in one tap.':'See Stub in 30 seconds.';
   const explainer=audience==='owner'
     ?'Create a request per unit and month, send the link, and see each payment confirmed on Nimiq mainnet.'
     :audience==='tenant'
       ?'Open the link your landlord sent you inside Nimiq Pay, check the details, and pay. You get an on-chain proof.'
       :'Explore a sample portfolio, then try the real flow with your own Nimiq Pay wallet.';
-  return `<section class="journey-shell" aria-label="Choose your RentRail pathway">
+  return `<section class="journey-shell" aria-label="Choose your Stub pathway">
     <div class="journey-head"><div><div class="eyebrow">HOW IT WORKS</div><h2>${escapeHtml(headline)}</h2><p>${escapeHtml(explainer)}</p></div><span class="journey-pill">NON-CUSTODIAL</span></div>
     ${audienceNavigation()}
     <ol class="journey-steps">${steps.map((step,i)=>`<li class="journey-step">
@@ -396,7 +396,7 @@ function guidedJourney(p:Portfolio):string{
       <div class="journey-step-copy"><strong>${escapeHtml(step.title)}</strong><p>${escapeHtml(step.description)}</p></div>
       <button class="journey-step-action" type="button" data-journey="${i}">${escapeHtml(step.label)} ${icon('arrow')}</button>
       </li>`).join('')}</ol>
-    ${audience==='tenant'?'<div id="tenant-help" class="tenant-help"><strong>For tenants</strong><p>Your landlord sends you a RentRail link for each month. Open it in Nimiq Pay → Mini Apps, check the amount and the receiving address, then tap Pay. Nimiq Pay asks you to confirm; RentRail never touches your funds. Already paid from another wallet? Use Check payment with your transaction hash.</p></div>':''}
+    ${audience==='tenant'?'<div id="tenant-help" class="tenant-help"><strong>For tenants</strong><p>Your landlord sends you a Stub link for each month. Open it in Nimiq Pay → Mini Apps, check the amount and the receiving address, then tap Pay. Nimiq Pay asks you to confirm; Stub never touches your funds. Already paid from another wallet? Use Check payment with your transaction hash.</p></div>':''}
   </section>`;
 }
 function overview(p: Portfolio): string {
@@ -407,7 +407,7 @@ function overview(p: Portfolio): string {
       <div class="landing-copy"><span class="pill-tag">A Nimiq Pay mini app</span><h1 class="display">The rent book,<br/><em>on-chain.</em></h1><p class="lede">Sign a lease once with your Nimiq Pay wallet. Every month your tenant pays in one tap, and the payment pulls into your ledger on Nimiq mainnet.</p>
       <div class="landing-ctas"><button id="preview-demo" class="primary" type="button">See it with sample units ${icon('arrow')}</button><button class="ghost" type="button" data-audience="tenant">I pay rent</button></div></div>
       <div class="landing-art" aria-hidden="true">
-        <div class="mini-ticket"><div class="ticket-top"><span class="ticket-brand">RentRail</span><span class="ticket-kind">RENT RECEIPT</span></div><div class="mt-route"><span>YOU</span><i></i><span>MAPLE · 2B</span></div><div class="mt-fare"><small>FARE</small><b>1250<em> NIM</em></b></div><div class="stamp small">PAID</div></div>
+        <div class="mini-ticket"><div class="ticket-top"><span class="ticket-brand">Stub</span><span class="ticket-kind">RENT RECEIPT</span></div><div class="mt-route"><span>YOU</span><i></i><span>MAPLE · 2B</span></div><div class="mt-fare"><small>FARE</small><b>1250<em> NIM</em></b></div><div class="stamp small">PAID</div></div>
         <div class="mini-lines">${[['101','#FF5B1F',['paid','paid','paid','paid']],['102','#2433A0',['paid','paid','paid','late']],['S3','#00A99D',['paid','paid','paid','partial']]].map(([b,c,st])=>`<div class="line-row"><span class="bullet" style="--line:${c}">${b}</span>${rentRail((st as string[]).map((x,i)=>({period:addMonths(currentPeriod(),i-3),state:x as RailState})),true,c as string)}</div>`).join('')}</div>
       </div>
     </section>
@@ -437,7 +437,7 @@ function whyNimiq():string{
   const items=[
     ['wallet','Your wallet is your account','No sign-up, email or password. Landlords and tenants are their Nimiq Pay wallets.'],
     ['shield','Signed requests','Every request is signed by the landlord\'s wallet. A changed address or amount blocks payment.'],
-    ['receipt','The reference rides on-chain','The RR1 code travels inside the Nimiq transaction, so each payment finds its unit and month.'],
+    ['receipt','The reference rides on-chain','The STUB1 code travels inside the Nimiq transaction, so each payment finds its unit and month.'],
     ['check','Native approval, fast finality','Tenants approve in the Nimiq Pay sheet. Final in about a minute, for a fraction of a cent.'],
   ];
   return `<section class="why-nimiq section reveal" aria-label="Why Nimiq Pay"><div class="section-heading"><div><div class="eyebrow">BUILT ON NIMIQ PAY</div><h2>Why this only works here</h2></div></div>
@@ -488,7 +488,7 @@ function leasePanel(p:Portfolio):string{
     return `<div class="collection-row"><div><strong>${escapeHtml(pr?.name||'')} · ${escapeHtml(u.label)}</strong><small>${formatNim(l.amountLuna)} NIM / month · due day ${l.dueDay} · since ${escapeHtml(l.start)} · ${signed?'✓ signed':'unsigned'}</small></div><div class="row-actions">${signed||preview?'':`<button type="button" class="tertiary" data-sign-lease="${escapeHtml(l.id)}">Sign</button>`}<button type="button" class="tertiary" data-share-lease="${escapeHtml(l.id)}">Send lease link</button><button type="button" class="tertiary danger-text" data-end-lease="${escapeHtml(l.id)}">End</button></div></div>`;
   }).join('');
   return `<section class="panel lease-panel" aria-label="Monthly leases"><div class="section-heading"><div><div class="eyebrow">RECURRING</div><h2>Monthly leases</h2></div><span class="count">${leases.length}</span></div>
-    <p class="form-hint">Sign a lease once. RentRail creates the request every month, your tenant sees the next rent in Nimiq Pay without a new link, and payments are detected automatically.</p>
+    <p class="form-hint">Sign a lease once. Stub creates the request every month, your tenant sees the next rent in Nimiq Pay without a new link, and payments are detected automatically.</p>
     <form id="lease-form" class="form-stack">
       <label>Unit<select name="unitId" required>${p.units.filter(u=>!leases.some(l=>l.unitId===u.id)).map(u=>`<option value="${escapeHtml(u.id)}">${normalizeLabel(p.properties.find(b=>b.id===u.propertyId)?.name||'')} / ${normalizeLabel(u.label)}</option>`).join('')}</select></label>
       <div class="form-duo"><label>Monthly rent (NIM)<input name="amount" inputmode="decimal" placeholder="1250.00" required/></label><label>Due day<input name="dueDay" type="number" min="1" max="28" value="1" required/></label></div>
@@ -505,7 +505,7 @@ function renewalPlanner(p:Portfolio):string {
   const eligible=source.filter(c=>!p.charges.some(x=>x.unitId===c.unitId&&x.period===next));
   const matches=nextPeriodPreview?.period===workspaceMonth && nextPeriodPreview.count===eligible.length;
   return `${leasePanel(p)}<details class="panel details-panel renewal-panel" aria-label="Next-month planner"><summary>One-off requests: copy this month to next month</summary>
-    <p class="form-hint">Copy every ${escapeHtml(workspaceMonth)} request that is not part of a lease into ${escapeHtml(next)}. Each new request gets a new RR1 reference.</p>
+    <p class="form-hint">Copy every ${escapeHtml(workspaceMonth)} request that is not part of a lease into ${escapeHtml(next)}. Each new request gets a new STUB1 reference.</p>
     <div class="period-filters"><label>Source month<input id="renewal-month" type="month" value="${escapeHtml(workspaceMonth)}"/></label></div>
     <div class="renewal-stats"><strong>${eligible.length}</strong> request${eligible.length===1?'':'s'} to create · ${source.length-eligible.length} already exist for ${escapeHtml(next)}</div>
     <div class="renewal-actions">
@@ -610,7 +610,7 @@ function chargesView(p:Portfolio):string {
     <label>Unit<select name="unitId" required>${p.units.map(u=>`<option value="${escapeHtml(u.id)}">${normalizeLabel(p.properties.find(b=>b.id===u.propertyId)?.name||'')} / ${normalizeLabel(u.label)}</option>`).join('')}</select></label>
     <div class="form-duo"><label>Month<input name="period" type="month" value="${currentPeriod()}" required /></label><label>Amount (NIM)<input name="amount" inputmode="decimal" placeholder="1250.00" required /></label></div>
     ${recipientField}
-    <p class="form-hint">Up to 2 decimals. The on-chain reference is a random RR1 code: no names go on-chain.</p>
+    <p class="form-hint">Up to 2 decimals. The on-chain reference is a random STUB1 code: no names go on-chain.</p>
     <button class="primary" type="submit" ${preview||!p.units.length?'disabled':''}>${icon('plus')} ${landlordWallet&&inNimiqPay?'Create and sign request':'Create request'}</button>
   </form></section><section class="stack"><div class="section-heading"><h2>Requests</h2>${unsigned&&landlordWallet?`<button id="sign-all" class="tertiary" type="button">${icon('shield')} Sign ${unsigned} unsigned</button>`:`<span class="count">${p.charges.length}</span>`}</div>${p.charges.length?p.charges.slice().reverse().map(c=>chargeRow(p,c)).join(''):emptyState('No rent requests yet','Add a property and a unit first.','properties','Add a property')}</section></div>
   ${renewalPlanner(p)}
@@ -635,7 +635,7 @@ function standaloneLookupPanel():string{
       <label>Receiving address <textarea name="recipient" rows="2" spellcheck="false" autocapitalize="off" placeholder="NQ.." required>${escapeHtml(manualReviewFields.recipient)}</textarea></label>
       <div class="form-duo">
         <label>Amount requested (NIM) <input name="amountNim" type="text" inputmode="decimal" placeholder="1250" required value="${escapeHtml(manualReviewFields.amountNim)}" /></label>
-        <label>Rent reference <input name="memo" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="RR1:..." maxlength="36" required value="${escapeHtml(manualReviewFields.memo)}" /></label>
+        <label>Rent reference <input name="memo" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="STUB1:..." maxlength="36" required value="${escapeHtml(manualReviewFields.memo)}" /></label>
       </div>
       <button class="primary" type="submit" ${manualReviewBusy?'disabled':''}>${manualReviewBusy?'Checking Nimiq mainnet…':'Check payment'} ${icon('arrow')}</button>
     </form>
@@ -659,7 +659,7 @@ function checkPaymentView(p:Portfolio):string {
     ${txRecordMessage?`<p class="inline-alert ok-alert" role="status">${escapeHtml(txRecordMessage)}</p>`:''}
     ${txVerifyResult?.state==='FINAL_MATCHED' && txVerifiedChargeId===txChargeId?'<button id="g3-copy-audit" class="tertiary" type="button">Copy proof link</button>':''}
   </section>`;
-  return `<div class="page-title"><div><div class="eyebrow">NIMIQ MAINNET</div><h1>Check a <em>payment.</em></h1><p>RentRail reads the transaction on Nimiq mainnet and checks the receiving address, the amount, the month's RR1 reference and finality.</p></div></div>
+  return `<div class="page-title"><div><div class="eyebrow">NIMIQ MAINNET</div><h1>Check a <em>payment.</em></h1><p>Stub reads the transaction on Nimiq mainnet and checks the receiving address, the amount, the month's STUB1 reference and finality.</p></div></div>
   ${own}
   <details class="panel details-panel" ${charges.length?'':'open'}><summary>Check any payment with its details</summary>
     <p class="form-hint">For a request that is not in this ledger: enter the details from the rent request.</p>
@@ -716,7 +716,7 @@ function tenantPaySection(request:SharedRequest):string{
     ${!blocked&&needsUnsignedAck?`<label class="consent"><input id="ack-unsigned" type="checkbox" ${unsignedAck?'checked':''}/> I confirmed this receiving address with my landlord.</label>`:''}
     <button id="send-payment" class="primary full pay-button" type="button" ${blocked||ackMissing||payState==='paying'?'disabled':''}>${payState==='paying'?'Waiting for Nimiq Pay…':escapeHtml(payButtonLabel(request))}</button>
     ${payMessage?`<div class="inline-alert" role="status">${escapeHtml(payMessage)}</div>`:''}
-    <p class="pay-note">You confirm the payment in Nimiq Pay. RentRail never holds your funds or keys.</p>`;
+    <p class="pay-note">You confirm the payment in Nimiq Pay. Stub never holds your funds or keys.</p>`;
 }
 function otherOpenMonths(request:SharedRequest):string{
   if(!request.lease)return '';
@@ -738,7 +738,7 @@ function tenantView(request:SharedRequest):string {
   return `<div class="checkout pay-sheet">
   <div class="ticket-wrap reveal"><article class="ticket ${trust.level} ${paid?'is-paid':''}" aria-label="Rent ticket">
     <div class="ticket-main">
-      <div class="ticket-top"><span class="ticket-brand"><span class="brand-symbol">R<span>·</span></span>RentRail</span><span class="ticket-kind">Rent receipt</span></div>
+      <div class="ticket-top"><span class="ticket-brand"><span class="brand-symbol stub-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M4 6h32v9a5 5 0 0 0 0 10v9H4v-9a5 5 0 0 0 0-10z" fill="currentColor"/><path d="M12 15v10" stroke="var(--paper,#F3ECDF)" stroke-width="2" stroke-dasharray="2 2.5"/><text x="25" y="27" text-anchor="middle" font-family="Archivo Variable,Arial" font-stretch="68%" font-weight="900" font-size="17" fill="var(--paper,#F3ECDF)">S</text></svg></span>Stub</span><span class="ticket-kind">Rent receipt</span></div>
       <div class="route">
         <div class="stop"><small>FROM</small><span class="you-dot">${tenantMemory.wallet?identiconImg(tenantMemory.wallet,40):icon('wallet')}</span><strong>You</strong></div>
         <div class="route-line" aria-hidden="true"><span class="train"></span></div>
@@ -752,7 +752,7 @@ function tenantView(request:SharedRequest):string {
     </div>
     <div class="perf" aria-hidden="true"></div>
     <div class="ticket-stub">
-      <div><small>TICKET NO.</small><b class="mono">${escapeHtml(request.memo.slice(4,12).toUpperCase())}·${escapeHtml(m)}</b></div>
+      <div><small>TICKET NO.</small><b class="mono">${escapeHtml(request.memo.slice(6,14).toUpperCase())}·${escapeHtml(m)}</b></div>
       <span class="trust-chip ${trust.level}">${trust.level==='signed'?`${icon('shield')} Validated · landlord signature`:trust.level==='unsigned'?`${icon('alert')} Not signed`:`${icon('alert')} Modified · do not pay`}</span>
     </div>
     <span class="punch" aria-hidden="true"></span>
@@ -771,7 +771,7 @@ function tenantView(request:SharedRequest):string {
     </details>
     <div class="pay-zone">${tenantPaySection(request)}</div>
     ${otherOpenMonths(request)}
-  </div>${tenantEvidencePanel(request)}<p class="checkout-foot"><a href="/">My rent on RentRail</a></p>${paid&&paidHash?receiptMarkup(tenantAudit(request,paidHash),receiptResult):''}</div>`;
+  </div>${tenantEvidencePanel(request)}<p class="checkout-foot"><a href="/">My rent on Stub</a></p>${paid&&paidHash?receiptMarkup(tenantAudit(request,paidHash),receiptResult):''}</div>`;
 }
 function tenantAudit(request:SharedRequest,hash:string):PublicPaymentAudit{
   const claim=entryFor(tenantMemory,request.chargeId)?.payment?.claim;
@@ -818,10 +818,10 @@ function independentAuditView(audit:PublicPaymentAudit):string {
     <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(r.memo.slice(0,14))}…</strong></div>
     <div class="detail"><span>Transaction</span><strong class="mono">${escapeHtml(audit.txHash.slice(0,16))}…</strong></div>
     ${status}
-    ${publicAuditRecorded?`<p class="inline-alert ok-alert" role="status">${escapeHtml(publicAuditRecorded)}</p>`:known?'':'<p class="form-hint">Landlord: open this link on the device that holds your RentRail ledger and the request is marked paid automatically.</p>'}
+    ${publicAuditRecorded?`<p class="inline-alert ok-alert" role="status">${escapeHtml(publicAuditRecorded)}</p>`:known?'':'<p class="form-hint">Landlord: open this link on the device that holds your Stub ledger and the request is marked paid automatically.</p>'}
     ${publicAuditResult?.state==='FINAL_MATCHED'?`<button id="audit-receipt" class="primary full" type="button">${icon('receipt')} Receipt (PDF)</button>`:''}
     <button id="audit-recheck" class="tertiary full" ${publicAuditBusy?'disabled':''} type="button">${publicAuditBusy?'Checking…':'Check again'} ${icon('arrow')}</button>
-    <a class="tertiary" href="/">Open RentRail</a>
+    <a class="tertiary" href="/">Open Stub</a>
   </section>${receiptMarkup(audit,publicAuditResult)}</div>`;
 }
 function receiptMarkup(audit:PublicPaymentAudit,result:VerifyResult|null):string{
@@ -832,7 +832,7 @@ function receiptMarkup(audit:PublicPaymentAudit,result:VerifyResult|null):string
   let qrSvg='';
   try{const q=qrcode(0,'L');q.addData(link);q.make();qrSvg=q.createSvgTag({cellSize:2,margin:0,scalable:true});}catch{qrSvg='';}
   return `<article class="receipt" aria-label="Rent payment receipt">
-    <header><div><strong>RentRail</strong><span>Rent payment receipt · on-chain proof</span></div><span class="receipt-badge">PAID ✓</span></header>
+    <header><div><strong>Stub</strong><span>Rent payment receipt · on-chain proof</span></div><span class="receipt-badge">PAID ✓</span></header>
     <h2>${escapeHtml(monthLabel(r.period))} rent${r.title?` · ${escapeHtml(r.title)}`:''}</h2>
     <dl>
       <div><dt>Amount</dt><dd>${typeof result.amountLuna==='number'?formatNim(result.amountLuna):formatNim(r.amountLuna)} NIM</dd></div>
@@ -849,12 +849,12 @@ function receiptMarkup(audit:PublicPaymentAudit,result:VerifyResult|null):string
 }
 function render():void {
   const p=activePortfolio();
-  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid proof link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Open RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid rent request link</h1><p>${escapeHtml(tenantError)}</p><a href="/">Open RentRail</a></div>`:({overview:()=>overview(p),properties:()=>propertiesView(p),charges:()=>chargesView(p),collections:()=>collectionsView(p),wallet:()=>checkPaymentView(p)})[selectedView]();
+  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid proof link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Open Stub</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid rent request link</h1><p>${escapeHtml(tenantError)}</p><a href="/">Open Stub</a></div>`:({overview:()=>overview(p),properties:()=>propertiesView(p),charges:()=>chargesView(p),collections:()=>collectionsView(p),wallet:()=>checkPaymentView(p)})[selectedView]();
   root!.innerHTML=`<div class="app-shell ${tenantRequest||publicAudit||publicAuditError?'tenant-shell':''}">
-    <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>RENT ON NIMIQ PAY</small></span></a>
+    <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol stub-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M4 6h32v9a5 5 0 0 0 0 10v9H4v-9a5 5 0 0 0 0-10z" fill="currentColor"/><path d="M12 15v10" stroke="var(--paper,#F3ECDF)" stroke-width="2" stroke-dasharray="2 2.5"/><text x="25" y="27" text-anchor="middle" font-family="Archivo Variable,Arial" font-stretch="68%" font-weight="900" font-size="17" fill="var(--paper,#F3ECDF)">S</text></svg></span><span>stub<small>RENT ON NIMIQ PAY</small></span></a>
       <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent requests','receipt')}${navButton('collections','Monthly review','calendar-clock')}${navButton('wallet','Check payment','wallet')}</nav>
       <div class="sidebar-bottom"><div class="side-note">${icon('shield')}<span>Non-custodial<br/><small>Tenant pays landlord directly</small></span></div></div>
-    </aside><div class="main-wrap"><header class="topbar"><a class="mobile-brand" href="/"><span class="brand-symbol">R<span>·</span></span><small>rentrail</small></a><span class="topbar-caption">${publicAudit?'PAYMENT PROOF':tenantRequest?'RENT REQUEST':({overview:'OVERVIEW',properties:'PROPERTIES',charges:'RENT REQUESTS',collections:'MONTHLY REVIEW',wallet:'CHECK PAYMENT'})[selectedView]}</span><div class="topbar-right">${preview?'<span class="label-chip">SAMPLE</span>':''}${walletIndicator()}</div></header>
+    </aside><div class="main-wrap"><header class="topbar"><a class="mobile-brand" href="/"><span class="brand-symbol stub-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M4 6h32v9a5 5 0 0 0 0 10v9H4v-9a5 5 0 0 0 0-10z" fill="currentColor"/><path d="M12 15v10" stroke="var(--paper,#F3ECDF)" stroke-width="2" stroke-dasharray="2 2.5"/><text x="25" y="27" text-anchor="middle" font-family="Archivo Variable,Arial" font-stretch="68%" font-weight="900" font-size="17" fill="var(--paper,#F3ECDF)">S</text></svg></span><small>stub</small></a><span class="topbar-caption">${publicAudit?'PAYMENT PROOF':tenantRequest?'RENT REQUEST':({overview:'OVERVIEW',properties:'PROPERTIES',charges:'RENT REQUESTS',collections:'MONTHLY REVIEW',wallet:'CHECK PAYMENT'})[selectedView]}</span><div class="topbar-right">${preview?'<span class="label-chip">SAMPLE</span>':''}${walletIndicator()}</div></header>
       <main class="main-content">${preview?`<div class="demo-banner">${icon('alert')} Sample portfolio: fictional units, nothing is sent. <button id="exit-preview">Exit sample</button></div>`:''}${content}${toast?`<div class="toast" role="status">${escapeHtml(toast)}</div>`:''}</main>
       ${!tenantRequest&&!publicAudit&&!publicAuditError?`<nav class="mobile-nav" aria-label="Mobile navigation">${navButton('overview','Home','home')}${navButton('properties','Units','building')}${navButton('charges','Rent','receipt')}${navButton('collections','Review','calendar-clock')}${navButton('wallet','Check','wallet')}</nav>`:''}
     </div></div>`;
@@ -1002,12 +1002,12 @@ function bindEvents():void {
   root!.querySelector('#download-collections')?.addEventListener('click',()=>{
     const report=collectionQueue(activePortfolio(),localDay(),dueDays,collectionsPropertyFilter,proofEvidence(activePortfolio()));
     if(!report.lines.length)return;
-    downloadFile('rentrail-review-'+localDay()+'.csv','﻿'+collectionCsv(report),'text/csv;charset=utf-8');
+    downloadFile('stub-review-'+localDay()+'.csv','﻿'+collectionCsv(report),'text/csv;charset=utf-8');
     success('CSV exported.');
   });
   root!.querySelector('#export-backup')?.addEventListener('click',()=>{
     if(preview)return;
-    downloadFile('rentrail-backup-'+localDay()+'.json',createBackup(portfolio,storedProofs,dueDays,new Date(),leases,unitTenants),'application/json');
+    downloadFile('stub-backup-'+localDay()+'.json',createBackup(portfolio,storedProofs,dueDays,new Date(),leases,unitTenants),'application/json');
     success('Backup exported. Keep the file somewhere safe.');
   });
   root!.querySelector<HTMLInputElement>('#import-backup')?.addEventListener('change',async e=>{
@@ -1311,7 +1311,7 @@ async function onPrintTenantReceipt():Promise<void>{
 
 /**
  * Finds rent payments sent to this landlord's receiving addresses: lists recent incoming
- * transfers carrying an RR1 reference, matches them to requests, and credits each one only
+ * transfers carrying an STUB1 reference, matches them to requests, and credits each one only
  * after the full on-chain check (recipient, amount, reference, execution, finality).
  */
 async function onSyncPayments(quiet=false):Promise<void>{
@@ -1373,7 +1373,7 @@ async function onShareLease(id:string):Promise<void>{
   const period=months.length?months[months.length-1]:l.start;
   const url=new URL(window.location.pathname,window.location.origin);
   url.searchParams.set('pay',encodeRequest(leaseRequest(l,period)));
-  await shareOrCopy(url.toString(),`Your monthly rent on RentRail${l.title?` (${l.title})`:''}: ${formatNim(l.amountLuna)} NIM, due on day ${l.dueDay}. Open in Nimiq Pay:`,'Lease link copied. Send it to your tenant once: every month will appear in their app.');
+  await shareOrCopy(url.toString(),`Your monthly rent on Stub${l.title?` (${l.title})`:''}: ${formatNim(l.amountLuna)} NIM, due on day ${l.dueDay}. Open in Nimiq Pay:`,'Lease link copied. Send it to your tenant once: every month will appear in their app.');
 }
 {
   const created=generateLeaseCharges();

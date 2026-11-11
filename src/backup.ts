@@ -17,10 +17,10 @@ export function createBackup(portfolio: Portfolio, proofs: StoredProof[], dueDay
 export function restoreBackup(text: string): { portfolio: Portfolio; proofs: StoredProof[]; dueDays: Record<string, number>; leases: Lease[]; unitTenants: Record<string, string> } {
   if (text.length > 5_000_000) throw Error('Backup file is too large.');
   let data: unknown;
-  try { data = JSON.parse(text); } catch { throw Error('This is not a RentRail backup file.'); }
+  try { data = JSON.parse(text); } catch { throw Error('This is not a Stub backup file.'); }
   const b = data as Partial<Backup> | null;
   if (!b || typeof b !== 'object' || b.app !== 'rentrail' || b.version !== 1 || !b.portfolio || typeof b.portfolio !== 'object')
-    throw Error('This is not a RentRail backup file.');
+    throw Error('This is not a Stub backup file.');
   const src = b.portfolio as Partial<Portfolio>;
   if (!Array.isArray(src.properties) || !Array.isArray(src.units) || !Array.isArray(src.charges)) throw Error('The backup is incomplete.');
   let p = emptyPortfolio();

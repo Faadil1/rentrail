@@ -132,7 +132,7 @@ export async function verifyNimTransaction(
   const unverified=(message: string, state: VerifyState='UNKNOWN', extras: Partial<VerifyResult>={})=>
     result(state,message,hash,observedAt,'UNVERIFIED',extras);
   if(!validHash(hash)||!looksLikeNimiqAddress(input.recipient)||
-     !/^RR1:[a-f0-9]{32}$/.test(input.memo)||!isSafeLuna(input.amountLuna)){
+     !/^STUB1:[a-f0-9]{32}$/.test(input.memo)||!isSafeLuna(input.amountLuna)){
     return unverified('Invalid transaction hash or rent request. Nothing was verified.','REVIEW_REQUIRED');
   }
   try {
@@ -191,7 +191,7 @@ export async function verifyNimTransaction(
 
 export interface IncomingCandidate { hash: string; memo: string; amountLuna: number }
 /**
- * Lists recent incoming transfers to `address` that carry an RR1 rent reference.
+ * Lists recent incoming transfers to `address` that carry an STUB1 rent reference.
  * Candidates only: each one must still pass verifyNimTransaction() before it is credited.
  */
 export async function findIncomingRentPayments(
@@ -208,7 +208,7 @@ export async function findIncomingRentPayments(
     if(typeof tx.to!=='string'||normalizeAddress(tx.to)!==normalizeAddress(address))continue;
     if(tx.executionResult===false)continue;
     const memo=decodeRecipientData(tx.recipientData);
-    if(!memo||!/^RR1:[a-f0-9]{32}$/.test(memo))continue;
+    if(!memo||!/^STUB1:[a-f0-9]{32}$/.test(memo))continue;
     const amount=safeValue(tx.value);
     if(amount===null)continue;
     seen.add(tx.hash.toLowerCase());

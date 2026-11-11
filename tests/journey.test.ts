@@ -41,7 +41,7 @@ test('explorer can inspect fictional sample without payment',()=>{
 test('exact standalone proof lookup accepts valid NQ and 0.005 NIM',()=>{
  const x=parseManualPaymentReview(fields());
  assert.equal(x.amountLuna,500);assert.equal(x.recipient,addr);
- assert.equal(x.memo,'RR1:'+id);assert.equal(x.hash,hash);
+ assert.equal(x.memo,'STUB1:'+id);assert.equal(x.hash,hash);
  assert.equal(x.allowPartial,true);
 });
 test('standalone lookup trims hash and normalizes NQ case and whitespace',()=>{
@@ -57,8 +57,8 @@ test('incorrect NQ checksum rejected before RPC read',()=>{
  assert.throws(()=>parseManualPaymentReview({...fields(),recipient:'NQ01 1111 1111 1111 1111 1111 1111 1111 1111'}),/checksum/);
 });
 test('empty recipient rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),recipient:''}),/valid Nimiq/));
-test('wrong memo prefix rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),memo:'TX:'+id}),/RR1:/));
-test('wrong reference length rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),memo:'RR1:'+id.slice(0,30)}),/RR1:/));
+test('wrong memo prefix rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),memo:'TX:'+id}),/STUB1:/));
+test('wrong reference length rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),memo:'STUB1:'+id.slice(0,30)}),/STUB1:/));
 test('blank NIM rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),amountNim:''}),/positive/));
 test('too many decimal digits rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),amountNim:'0.000001'}),/five decimal/));
 test('zero or negative NIM rejected',()=>{

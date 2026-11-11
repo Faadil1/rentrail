@@ -121,7 +121,7 @@ export function createId(randomBytes: Uint8Array): string {
 }
 export function makeMemo(id: string): string {
   if (!/^[0-9a-f]{32}$/.test(id)) throw new Error('Invalid opaque request ID.');
-  const memo = `RR1:${id}`;
+  const memo = `STUB1:${id}`;
   if (new TextEncoder().encode(memo).length > 64) throw new Error('Public memo exceeds 64 bytes.');
   return memo;
 }
@@ -139,7 +139,7 @@ export function addCharge(p: Portfolio, charge: Charge): Portfolio {
   if (!p.units.some(x => x.id === charge.unitId)) throw new Error('Unknown unit.');
   if (!isSafeLuna(charge.amountLuna)) throw new Error('Invalid amount.');
   if (!looksLikeNimiqAddress(charge.recipient)) throw new Error('Invalid Nimiq address structure.');
-  if (!/^RR1:[0-9a-f]{32}$/.test(charge.memo)) throw new Error('Memo must be an opaque request reference.');
+  if (!/^STUB1:[0-9a-f]{32}$/.test(charge.memo)) throw new Error('Memo must be an opaque request reference.');
   if (p.charges.some(x => x.id === charge.id || x.memo === charge.memo)) throw new Error('Duplicate charge or public reference.');
   if (p.charges.some(x => x.unitId === charge.unitId && x.period === charge.period)) {
     throw new Error('An obligation for this unit and period already exists.');

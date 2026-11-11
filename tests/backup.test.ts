@@ -20,10 +20,10 @@ test('backup round-trips ledger, proofs and due days', () => {
 });
 
 test('tampered or foreign files are rejected or cleaned', () => {
-  assert.throws(() => restoreBackup('nope'), /not a RentRail backup/);
-  assert.throws(() => restoreBackup('{"app":"other","version":1}'), /not a RentRail backup/);
+  assert.throws(() => restoreBackup('nope'), /not a Stub backup/);
+  assert.throws(() => restoreBackup('{"app":"other","version":1}'), /not a Stub backup/);
   const raw = JSON.parse(createBackup(sample(), [], {}));
-  raw.portfolio.charges[0].memo = 'RR1:tenant name';
+  raw.portfolio.charges[0].memo = 'STUB1:tenant name';
   assert.throws(() => restoreBackup(JSON.stringify(raw)));
   const orphan = JSON.parse(createBackup(sample(), [{ chargeId: '9'.repeat(32), hash: 'b'.repeat(64), amountLuna: 1, verifiedAt: at }], { ['8'.repeat(32)]: 3 }));
   const cleaned = restoreBackup(JSON.stringify(orphan));

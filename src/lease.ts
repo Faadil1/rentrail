@@ -5,7 +5,7 @@ import { compactNimiqAddress } from './address-validation.ts';
 /**
  * A monthly lease: one signed link, every month's rent request derived from it.
  * The landlord signs the lease once with their Nimiq Pay wallet. Each month's
- * request ID and RR1 reference are computed from the lease ID and the month, so the
+ * request ID and STUB1 reference are computed from the lease ID and the month, so the
  * tenant's app and the landlord's ledger agree without any server or new link.
  */
 export interface Lease {
@@ -40,13 +40,13 @@ export function validateLease(raw: unknown): Lease {
 export function leaseMessage(l: Lease): string {
   const nim = (l.amountLuna / 100_000).toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
   const title = l.title ? `\nFor: ${asciiJson(l.title)}` : '';
-  return `RentRail monthly lease${title}\nPay to: ${compactNimiqAddress(l.recipient)}\nMonthly: ${nim} NIM (${l.amountLuna} Luna)\nFrom: ${l.start}\nDue day: ${l.dueDay}\nLease: ${l.id}`;
+  return `Stub monthly lease${title}\nPay to: ${compactNimiqAddress(l.recipient)}\nMonthly: ${nim} NIM (${l.amountLuna} Luna)\nFrom: ${l.start}\nDue day: ${l.dueDay}\nLease: ${l.id}`;
 }
 
 /** Request ID for a lease month: SHA-256(lease id + month), first 16 bytes as hex. */
 export function leaseChargeId(leaseId: string, period: string): string {
   assertPeriod(period);
-  const digest = sha256(new TextEncoder().encode(`RentRail:${leaseId}:${period}`));
+  const digest = sha256(new TextEncoder().encode(`Stub:${leaseId}:${period}`));
   return Array.from(digest.slice(0, 16), b => b.toString(16).padStart(2, '0')).join('');
 }
 

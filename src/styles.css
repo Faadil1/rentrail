@@ -250,7 +250,7 @@ a.charge-row{color:inherit}
 .other-months{margin-top:16px;padding:12px 14px;border-radius:12px;background:#fff6e5;display:flex;flex-direction:column;gap:6px;font-size:12px}
 .other-months a{color:#2f63c4;font-weight:800}
 
-/* ================= RentRail visual identity (Nimiq-native) ================= */
+/* ================= Stub visual identity (Nimiq-native) ================= */
 :root{--navy:#1F2348;--navy2:#2B3062;--gold:#E9B213;--green:#21BCA5;--red:#D94432;--sky:#0582CA;--ink:#1F2348;--sub:#6B7091;--line:#E6E8F0;--bg:#F5F6FA;
   font-family:'DM Sans Variable','DM Sans',system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:var(--bg)}
 body{background:var(--bg)}
@@ -347,7 +347,7 @@ h1 em,.welcome h1 em{color:var(--gold);font-style:normal}
 @media(max-width:700px){.how{grid-template-columns:1fr}}
 
 /* =====================================================================
-   RentRail v4 · "Rent book × rent lines"
+   Stub v4 · "Rent book × rent lines"
    Two-colour risograph rent book (ultramarine + fluo orange) on recycled
    paper, with each unit drawn as its own transit line.
    ===================================================================== */
@@ -604,3 +604,9 @@ button:disabled{opacity:.4}
 .station.st-late .dot{border-color:white;box-shadow:0 0 0 3px var(--orange)}
 .sheet-rail .station small,.landing-art .station small{display:none}
 .sheet-rail .rail:not(.compact) .station::before{top:5px}
+/* Stub mark: a torn ticket stub */
+.brand-symbol.stub-mark{background:transparent !important;color:var(--orange);border-radius:0;width:34px;height:34px;padding:0;box-shadow:none}
+.brand-symbol.stub-mark svg{width:100%;height:100%;display:block;transform:rotate(-8deg)}
+.mobile-brand .brand-symbol.stub-mark{width:32px;height:32px}
+.ticket-brand .brand-symbol.stub-mark{width:28px;height:28px}
+.mobile-brand small,.brand{font-size:26px;letter-spacing:-.01em}

@@ -12,7 +12,7 @@ export class PayError extends Error {
 
 /**
  * Opens the native Nimiq Pay confirmation for exactly this rent request.
- * The tenant approves (or cancels) in Nimiq Pay; RentRail never sees keys.
+ * The tenant approves (or cancels) in Nimiq Pay; Stub never sees keys.
  * The returned hash is only "sent": the caller must verify it on-chain.
  */
 export async function payRentRequest(raw: SharedRequest): Promise<string> {

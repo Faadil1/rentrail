@@ -5,7 +5,7 @@ import {createReadOnlyRpc,decodeRecipientData,verifyNimTransaction,
 
 const t=1794236120000;
 const id='0123456789abcdef0123456789abcdef';
-const memo='RR1:'+id;
+const memo='STUB1:'+id;
 const hash='a'.repeat(64);
 const recipient='NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 const otherRecipient='NQ01 1111 1111 1111 1111 1111 1111 1111 1111';
@@ -127,10 +127,10 @@ test('RPC uses pinned HTTPS endpoint, no credentials and read-only POST',async()
 });
 
 import { findIncomingRentPayments } from '../src/rpc.ts';
-test('incoming scan keeps only RR1-tagged transfers to the landlord address', async () => {
+test('incoming scan keeps only STUB1-tagged transfers to the landlord address', async () => {
   const to = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
   const hex = (s: string) => Buffer.from(s).toString('hex');
-  const memo = 'RR1:' + 'a'.repeat(32);
+  const memo = 'STUB1:' + 'a'.repeat(32);
   const rows = [
     { hash: '1'.repeat(64), to, value: 125000, recipientData: hex(memo), executionResult: true },
     { hash: '1'.repeat(64), to, value: 125000, recipientData: hex(memo), executionResult: true },
