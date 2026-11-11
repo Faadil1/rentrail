@@ -227,17 +227,19 @@ function guidedJourney(p:Portfolio):string{
   </section>`;
 }
 function overview(p: Portfolio): string {
-  const sum = p.charges.reduce((n,c)=>n+c.amountLuna,0);
-  const submitted = p.charges.filter(c=>p.submissions.some(s=>s.chargeId===c.id)).length;
+  // Dashboard totals must have an explicit period; never silently total all years.
+  const snap=monthSnapshot(p,workspaceMonth);
+  const sum = snap.expectedLuna;
+  const submitted = p.charges.filter(c=>c.period===workspaceMonth&&p.submissions.some(s=>s.chargeId===c.id)).length;
   const chargeCards = p.charges.slice().reverse().slice(0,6).map(c=>chargeRow(p,c)).join('');
   const opener=`<div class="welcome"><div><div class="eyebrow">RENTAL OPERATIONS · NIMIQ PAY</div><h1>Know which rent. <em>Know which payment.</em></h1><p>One place to prepare rental obligations, track monthly follow-ups and independently check transfers already made.</p></div><div class="welcome-symbol">${icon('layers')}</div></div>
     ${guidedJourney(p)}`;
   if(audience==='tenant')return opener+statusGuide()+`<div class="safety"><span>${icon('shield')}</span><div><strong>No wallet payments from this preview.</strong><p>RentRail does not hold funds or prove who owns a receiving wallet.</p></div></div>`;
   return `${opener}
     <div class="metric-grid">
-      <div class="metric"><div class="metric-top"><span>Total obligations</span>${icon('receipt')}</div><strong>${formatNim(sum)} <small>NIM</small></strong><span class="metric-foot">Recorded locally · not an on-chain balance</span></div>
+      <div class="metric"><div class="metric-top"><span>Requested · ${escapeHtml(workspaceMonth)}</span>${icon('receipt')}</div><strong>${formatNim(sum)} <small>NIM</small></strong><span class="metric-foot">This calendar month · local invoice amounts, not wallet balance</span></div>
       <div class="metric"><div class="metric-top"><span>Active units</span>${icon('home')}</div><strong>${p.units.length}</strong><span class="metric-foot">Across ${p.properties.length} properties</span></div>
-      <div class="metric"><div class="metric-top"><span>Unverified sends</span>${icon('clock')}</div><strong>${submitted}</strong><span class="metric-foot">Never counted as rent paid</span></div>
+      <div class="metric"><div class="metric-top"><span>Unverified sends · this month</span>${icon('clock')}</div><strong>${submitted}</strong><span class="metric-foot">Never counted as rent paid</span></div>
     </div>
     <div class="release-notice"><strong>Public verification edition · Cycle III</strong><p>Organize local rent invoices, check the Nimiq Pay wallet, and verify already-completed NIM payments with a public mainnet history node. <b>This public edition cannot initiate payments.</b> The first user-approved pilot succeeded on-chain but its native wallet dialog rounded 0.005 NIM to 0.01 NIM: that discrepancy remains under investigation.</p><button class="tertiary" data-nav="wallet">Check wallet &amp; verify an existing transfer ${icon('arrow')}</button></div>
     ${periodCockpit(p)}
