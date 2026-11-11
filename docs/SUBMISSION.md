@@ -8,19 +8,17 @@
 
 ## Description (under 250 words)
 
-RentRail turns rent into a monthly flow that only Nimiq Pay makes possible.
+RentRail turns monthly rent requests into verifiable NIM payment workflows inside Nimiq Pay.
 
-There are no accounts: landlords and tenants sign in with their Nimiq Pay wallets. A landlord adds properties and units, then signs a monthly lease once with their wallet. RentRail creates each month's request, with a unique RR1 reference that travels in the Nimiq transaction itself.
+Landlords and small property managers create properties and units, then prepare one-off requests or wallet-signed monthly leases. Each month receives an RR1 payment reference. A tenant opening the link can inspect the NIM amount and recipient, verify the signature when supported, and explicitly approve payment in Nimiq Pay. No keys or funds pass through RentRail.
 
-The tenant opens the link in Nimiq Pay. RentRail verifies the landlord's signature: a modified link blocks payment, and a new receiving address triggers a warning. The tenant taps Pay and approves in the native Nimiq Pay sheet. RentRail never holds funds or keys. It then confirms the transfer on Nimiq mainnet (recipient, amount, reference, execution, finality) and shows Paid, a PDF receipt with QR code, and a proof signed by the tenant's wallet.
+After the wallet returns a transaction hash, RentRail asks a public Nimiq mainnet history node to check the recipient, exact reference, amount, execution and finality. It distinguishes pending, partial, matched and uncertain transfers. Owners can search recent incoming transactions against their locally recorded requests and export or back up their records. A printable payment record includes a QR link for independent rechecking.
 
-The landlord's ledger detects incoming payments automatically, matches them to each unit and month, and shows who paid, who partly paid and who is late. Each payment counts once; payments from an unknown wallet are flagged. Every new month appears on both sides without a new link.
+A tenant may sign a claim linking their wallet to a payment hash. That signature identifies the claim signer, not necessarily the actual blockchain sender. Similarly, a signed rent request proves control of the receiving wallet key, not legal ownership of the property.
 
-Non-custodial and serverless: data stays on each device, with backup export.
+The app is non-custodial and browser-local. Recent-transaction discovery is limited and uses one external history node; mobile signing and payments require verification in Nimiq Pay. NIM is supported now; USDT is a future extension.
 
-While testing, we found that the Nimiq Pay confirmation sheet rounds amounts to 2 decimals, so RentRail keeps every request at 2 decimals.
-
-For landlords, small property managers and tenants who pay rent every month.
+_Word count: 207._
 
 ## Before submitting (human)
 
