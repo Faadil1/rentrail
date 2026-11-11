@@ -13,10 +13,10 @@ test('audience selection is allowlisted, not account authentication',()=>{
  assert.equal(validAudience('admin'),false);
  assert.equal(validAudience({role:'owner'}),false);
 });
-test('owner journey shows five concrete product steps',()=>{
+test('owner journey shows four concrete product steps ending in the monthly review',()=>{
  const j=journeySteps('owner',emptyPortfolio());
- assert.equal(j.length,5);assert.equal(j[0].state,'READY');
- assert.equal(j[3].view,'collections');assert.equal(j[4].view,'wallet');
+ assert.equal(j.length,4);assert.equal(j[0].state,'READY');
+ assert.equal(j[1].view,'charges');assert.equal(j[3].view,'collections');
 });
 test('local property, unit and charge steps indicate local setup only, never paid',()=>{
  let p=emptyPortfolio();
@@ -24,14 +24,15 @@ test('local property, unit and charge steps indicate local setup only, never pai
  p=addUnit(p,{id:'2'.repeat(32),propertyId:'1'.repeat(32),label:'1B'});
  p=addCharge(p,{id,unitId:'2'.repeat(32),period:'2026-11',amountLuna:500,recipient:addr,memo:makeMemo(id),createdAt:'2026-11-10T00:00:00Z'});
  const j=journeySteps('owner',p);
- assert.equal(j[0].state,'LOCAL_DONE');assert.equal(j[1].state,'LOCAL_DONE');assert.equal(j[2].state,'LOCAL_DONE');
- assert.equal(j[4].state,'READY');
- assert.equal(journeySteps('owner',p,true)[4].state,'LOCAL_DONE');
+ assert.equal(j[0].state,'LOCAL_DONE');assert.equal(j[1].state,'LOCAL_DONE');
+ assert.equal(j[3].state,'READY');
+ assert.equal(journeySteps('owner',p,true)[3].state,'LOCAL_DONE');
 });
-test('tenant is not falsely offered access to private landlord invoices',()=>{
+test('tenant journey starts from the landlord link and pays in Nimiq Pay',()=>{
  const j=journeySteps('tenant',emptyPortfolio());
  assert.equal(j[0].state,'GUIDANCE_ONLY');assert.equal(j[0].action,'instructions');
- assert.ok(j.every(step=>step.description.includes('link')||step.description.includes('address')||step.description.includes('demo')||step.description.includes('hash')));
+ assert.match(j[1].description,/Nimiq Pay wallet/);
+ assert.equal(j[2].view,'wallet');
 });
 test('explorer can inspect fictional sample without payment',()=>{
  const j=journeySteps('explorer',emptyPortfolio());assert.equal(j[0].action,'preview');
@@ -66,8 +67,8 @@ test('zero or negative NIM rejected',()=>{
 test('large unsafe NIM values rejected',()=>assert.throws(()=>parseManualPaymentReview({...fields(),amountNim:'9007199254740991'}),/safe integer/));
 test('glossary has four human-readable non-false states',()=>{
  assert.equal(statusExplanations.length,4);
- assert.match(statusExplanations[1].description,/alone does not confirm/);
- assert.match(statusExplanations[2].description,/one public mainnet node/i);
+ assert.match(statusExplanations[1].description,/waiting for the network to confirm/);
+ assert.match(statusExplanations[2].description,/exact amount.*right address.*reference.*finalized/);
 });
 
 test('full node-reported match is exact but never a legal receipt',()=>{

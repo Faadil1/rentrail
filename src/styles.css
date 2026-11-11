@@ -164,3 +164,33 @@
 .tenant-technical[open]>summary{margin-bottom:14px}
 .tenant-technical .smoke-panel{margin:0}
 @media(max-width:580px){.tenant-readonly-steps{padding:13px}.tenant-readonly-list>div{padding:11px}}
+
+/* Cycle III payment flow */
+.verify-result{margin:16px 0;padding:15px 16px;border-radius:13px;border:1px solid #dbe4ee;background:#f7f9fc;overflow-wrap:anywhere}
+.verify-result strong{display:block;font-size:14px;margin-bottom:6px}
+.verify-result p{font-size:12px;line-height:1.6;margin:0;color:#4d607b}
+.verify-result.ok{background:#ebfaf2;border-color:#b6ebcd}.verify-result.ok strong{color:#1f8a52}
+.verify-result.pending{background:#f2f6ff;border-color:#d5e2fb}.verify-result.pending strong{color:#2f63c4}
+.verify-result.bad{background:#fff4f2;border-color:#f7cfc9}.verify-result.bad strong{color:#b4473c}
+.verify-result details{margin-top:9px}.verify-result summary,.details-panel>summary,.crosscheck>summary{cursor:pointer;font-size:12px;font-weight:800;color:#3f6fc6}
+.verify-result details small{display:block;margin-top:6px;color:#7d8ca1;font-size:10px;line-height:1.6}
+.details-panel{margin-top:18px}.details-panel>summary{font-size:14px;padding:2px 0}.details-panel[open]>summary{margin-bottom:14px}
+.crosscheck{margin:4px 0 18px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}.crosscheck[open]>summary{margin-bottom:12px}
+.address-check{font-size:11px;font-weight:700;border-radius:9px;padding:9px 11px;margin:-4px 0 14px}.address-check.ok{background:#ebfaf2;color:#23794b}.address-check.bad{background:#fff0ee;color:#b4473c}
+.pay-button{min-height:54px;font-size:15px;border-radius:14px;margin-top:6px}
+.pay-note{text-align:center;font-size:11px;color:#8a99ad;margin:10px 0 0}
+.pay-progress{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:14px;background:#f2f6ff;border:1px solid #d5e2fb}
+.pay-step{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:#7d8ca1}.pay-step.done{color:#1f8a52}.pay-step.active{color:#2f63c4}
+.pay-progress small,.pay-success small{color:#8a99ad;font-size:10px;overflow-wrap:anywhere}
+.spinner{width:16px;height:16px;border:2px solid #c6d6f5;border-top-color:#2f63c4;border-radius:50%;animation:rr-spin .8s linear infinite;flex:none}
+@keyframes rr-spin{to{transform:rotate(360deg)}}
+.pay-success{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:22px 18px;border-radius:16px;background:#ebfaf2;border:1px solid #b6ebcd}
+.pay-success-icon{width:48px;height:48px;border-radius:50%;background:#2fb26e;color:white;display:flex;align-items:center;justify-content:center}.pay-success-icon svg{width:26px;height:26px}
+.pay-success strong{font-size:17px;color:#1f7f4b}.pay-success p{font-size:12px;line-height:1.6;color:#41634f;margin:0}
+.ok-alert{background:#ebfaf2;color:#23794b}
+.due-note{font-size:10px;color:#a57629;font-weight:700}
+.backup-panel{margin-top:22px}.backup-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.file-label{position:relative;cursor:pointer}.file-label input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.mobile-brand{gap:8px;align-items:center}.mobile-brand .brand-symbol{width:30px;height:30px;font-size:18px;border-radius:9px}
+.period-line .tag{margin-top:4px;display:inline-block}
+@media(max-width:700px){.mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}.mobile-nav .nav-item{padding:8px 2px}.checkout-value{font-size:42px}.pay-button{font-size:14px}}

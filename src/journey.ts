@@ -23,22 +23,20 @@ export function validAudience(x:unknown):x is Audience{
 /** A small pathway with honest completion: local setup is NOT proof of payment. */
 export function journeySteps(audience:Audience,p:Portfolio,hasNodeMatch=false):JourneyStep[]{
   if(audience==='owner')return [
-    {title:'Add your building',description:'Start with a name. Everything stays on this device.',action:'view',view:'properties',label:'Manage properties',state:p.properties.length?'LOCAL_DONE':'READY'},
-    {title:'Add a rental unit',description:'Give each apartment a local label, not a tenant identity.',action:'view',view:'properties',label:'Manage units',state:p.units.length?'LOCAL_DONE':'READY'},
-    {title:'Create a rent request',description:'Set the month, amount in NIM and confirmed receiving address.',action:'view',view:'charges',label:'Create rent request',state:p.charges.length?'LOCAL_DONE':'READY'},
-    {title:'Review upcoming and overdue dates',description:'Local due dates help organize follow-ups; they do not prove legal arrears.',action:'view',view:'collections',label:'Open collections review',state:'READY'},
-    {title:'Check a payment on-chain',description:'Only a matching, executed, final transaction can reduce session-level outstanding.',action:'view',view:'wallet',label:'Check a transaction',state:hasNodeMatch?'LOCAL_DONE':'READY'},
+    {title:'Add your building and units',description:'One building or a whole portfolio. Labels stay on this device.',action:'view',view:'properties',label:'Add property',state:p.units.length?'LOCAL_DONE':'READY'},
+    {title:'Create this month\'s rent request',description:'Pick the unit, month, amount in NIM and your receiving address. Each request gets a unique RR1 reference.',action:'view',view:'charges',label:'Create request',state:p.charges.length?'LOCAL_DONE':'READY'},
+    {title:'Send the link to your tenant',description:'Your tenant opens it in Nimiq Pay and pays in one tap. No account needed.',action:'view',view:'charges',label:'Share a request',state:'READY'},
+    {title:'See who has paid',description:'Payments are confirmed on Nimiq mainnet and your ledger updates: paid, partly paid or still due.',action:'view',view:'collections',label:'Review this month',state:hasNodeMatch?'LOCAL_DONE':'READY'},
   ];
   if(audience==='tenant')return [
-    {title:'Get a request link',description:'Your landlord shares a month-specific link. This demo cannot discover private invoices for you.',action:'instructions',label:'How request links work',state:'GUIDANCE_ONLY'},
-    {title:'Check who receives the NIM',description:'Confirm the address with your landlord outside an editable link. A valid NQ checksum does not prove identity.',action:'instructions',label:'Recipient safety',state:'GUIDANCE_ONLY'},
-    {title:'Pay only through an approved wallet flow',description:'This public demo never sends NIM. The old controlled mainnet pilot is closed.',action:'instructions',label:'Understand payment safety',state:'GUIDANCE_ONLY'},
-    {title:'Verify an existing payment',description:'If you already paid, use the transaction hash, recipient, amount and reference for a read-only blockchain check.',action:'view',view:'wallet',label:'Verify my transaction',state:'READY'},
+    {title:'Open the link from your landlord',description:'It shows the month, the amount and who receives the rent.',action:'instructions',label:'How it works',state:'GUIDANCE_ONLY'},
+    {title:'Pay with Nimiq Pay',description:'Approve the payment in your Nimiq Pay wallet. RentRail never holds your funds or keys.',action:'instructions',label:'Payment safety',state:'GUIDANCE_ONLY'},
+    {title:'Get your on-chain proof',description:'RentRail confirms the transfer on Nimiq mainnet and gives you a proof link to send to your landlord.',action:'view',view:'wallet',label:'Check a payment',state:'READY'},
   ];
   return [
-    {title:'Explore a realistic example',description:'See fictional properties and invoices without accounts, sending money or changing your saved portfolio.',action:'preview',label:'Explore sample workspace',state:'READY'},
-    {title:'Understand the monthly workflow',description:'See which rent periods exist, what is expected and which records still need evidence.',action:'view',view:'collections',label:'View monthly review',state:'READY'},
-    {title:'See independent verification',description:'Explore how Nimiq mainnet reports recipient, Luna amount, reference and later macroblock.',action:'view',view:'wallet',label:'Explore verification',state:'READY'},
+    {title:'Explore a sample portfolio',description:'Two buildings, three units, one rent already paid on-chain. Nothing is sent.',action:'preview',label:'Open sample',state:'READY'},
+    {title:'See the monthly review',description:'Who paid, who partly paid and what is still due this month.',action:'view',view:'collections',label:'Monthly review',state:'READY'},
+    {title:'Check a real payment',description:'Paste a Nimiq transaction and see it confirmed against a rent request on mainnet.',action:'view',view:'wallet',label:'Check payment',state:'READY'},
   ];
 }
 
@@ -60,10 +58,10 @@ export function parseManualPaymentReview(fields:ManualPaymentReviewFields):Verif
 }
 
 export const statusExplanations=[
-  {title:'Requested',description:'A local amount and month were recorded. This does not prove a transfer happened.'},
-  {title:'Sent / hash received',description:'A wallet may have returned a transaction reference; this alone does not confirm success.'},
-  {title:'Matched on-chain',description:'One public mainnet node reported the correct recipient, amount, reference and a later finality block.'},
-  {title:'Needs review',description:'The payment is missing, partial, mismatched or uncertain. Ask a human to investigate.'},
+  {title:'Awaiting payment',description:'The request exists for this unit and month. Nothing has been paid yet.'},
+  {title:'Payment sent',description:'The tenant approved the payment in Nimiq Pay. RentRail is waiting for the network to confirm it.'},
+  {title:'Paid ✓ confirmed on-chain',description:'Nimiq mainnet shows the exact amount, to the right address, with this month\'s reference, finalized.'},
+  {title:'Needs review',description:'Partly paid, overpaid or not matching the request. Check it with your tenant.'},
 ] as const;
 
 /** A node's reported transfer may be partial; never label it fully settled. */
