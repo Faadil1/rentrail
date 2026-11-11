@@ -158,7 +158,7 @@ function safePersist(update: Portfolio): void {
   render();
 }
 function statusText(status: ChargeViewStatus): string {
-  return ({ OPEN:'Unpaid', SUBMITTED_UNVERIFIED:'Unverified', PARTIALLY_FUNDED:'Partial', PAID_ONCHAIN_VERIFIED:'Chain verified', REVIEW_REQUIRED:'Needs review' })[status];
+  return ({ OPEN:'Request open', SUBMITTED_UNVERIFIED:'Hash not checked', PARTIALLY_FUNDED:'Partial node match', PAID_ONCHAIN_VERIFIED:'Node match observed', REVIEW_REQUIRED:'Needs review' })[status];
 }
 function statusClass(status: ChargeViewStatus): string {
   return ({OPEN:'neutral',SUBMITTED_UNVERIFIED:'amber',PARTIALLY_FUNDED:'amber',PAID_ONCHAIN_VERIFIED:'green',REVIEW_REQUIRED:'red'})[status];
@@ -262,7 +262,7 @@ function periodCockpit(p:Portfolio):string {
     <label>Property<select id="property-filter"><option value="">All properties</option>${options}</select></label></div>
     <div class="period-metrics">
       <div><small>Amount requested</small><strong>${formatNim(snap.expectedLuna)} NIM</strong></div>
-      <div><small>Unverified outstanding</small><strong>${formatNim(snap.outstandingLuna)} NIM</strong></div>
+      <div><small>Not matched on-chain</small><strong>${formatNim(snap.outstandingLuna)} NIM</strong></div>
       <div><small>Units missing an invoice</small><strong>${snap.unitsWithoutCharge} / ${snap.activeUnits}</strong></div>
       <div><small>Wallet sends awaiting proof</small><strong>${snap.awaitingProof}</strong></div>
     </div>
@@ -319,7 +319,7 @@ function collectionsView(p:Portfolio):string {
     <div><strong>${formatNim(x.outstandingLuna)} NIM</strong><small>${escapeHtml(x.ageBucket)} · ${x.state==='NODE_MATCH_THIS_SESSION'?'Single-node match observed this session; recheck later':x.state==='NODE_REVIEW_REQUIRED'?'Node mismatch requires review':x.state==='TX_NEEDS_VERIFICATION'?'Wallet hash pending proof':'No verified settlement evidence'}</small></div>
     <button class="tertiary" type="button" data-reminder="${escapeHtml(x.chargeId)}">Copy follow-up draft</button>
   </article>`).join('');
-  return `<div class="page-title"><div><div class="eyebrow">RENTAL OPERATIONS · COLLECTIONS</div><h1>Act on the <em>unverified.</em></h1><p>Aging, due dates and follow-up drafts based on local obligations. Nothing here proves debt, payment or legal delinquency.</p></div></div>
+  return `<div class="page-title"><div><div class="eyebrow">RENTAL OPERATIONS · COLLECTIONS</div><h1>Review <em>what is due.</em></h1><p>See local rent dates, requested amounts, and records that still need payment evidence. A late date is not proof of legal arrears.</p></div></div>
   <section class="collection-summary panel" aria-label="Collections review">
     <div class="section-heading"><h2>Collections review · ${escapeHtml(today)}</h2><span class="count">Unverified local records only</span></div>
     <div class="period-filters"><label>Property<select id="collections-property"><option value="">All properties</option>${optionProperties}</select></label></div>
@@ -341,8 +341,8 @@ function collectionsView(p:Portfolio):string {
   <div class="safety"><span>${icon('shield')}</span><div><strong>Human review, not automated collection.</strong><p>All reminders are drafts. RentRail does not send messages, charge late fees, debit a wallet or report tenants as delinquent.</p></div></div>`;
 }
 function chargesView(p:Portfolio):string {
-  return `<div class="page-title"><div><div class="eyebrow">RENT LEDGER</div><h1>Monthly <em>obligations.</em></h1><p>Requests and partial-payment accounting, without false confirmations.</p></div></div>
-  <div class="two-col"><section class="panel"><h3>New rent obligation</h3><form id="charge-form" class="form-stack">
+  return `<div class="page-title"><div><div class="eyebrow">RENT LEDGER</div><h1>Monthly <em>rent requests.</em></h1><p>Create a request for a specific unit and month, then review payment evidence separately.</p></div></div>
+  <div class="two-col"><section class="panel"><h3>Create a rent request</h3><form id="charge-form" class="form-stack">
     <label>Unit<select name="unitId" required>${p.units.map(u=>`<option value="${escapeHtml(u.id)}">${normalizeLabel(p.properties.find(b=>b.id===u.propertyId)?.name||'')} / ${normalizeLabel(u.label)}</option>`).join('')}</select></label>
     <div class="form-duo"><label>Period<input name="period" type="month" value="${currentPeriod()}" required /></label><label>Amount in NIM<input name="amount" inputmode="decimal" placeholder="1.25" required /></label></div>
     <label>Landlord's Nimiq receiving address<textarea name="recipient" rows="2" placeholder="NQ..." spellcheck="false" required></textarea></label>
@@ -371,7 +371,7 @@ function walletInventoryPanel():string {
   </section>`;
 }
 function walletView():string {
-  return `<div class="page-title"><div><div class="eyebrow">NIMIQ PAY · HOST GATE</div><h1>Wallet <em>connection.</em></h1><p>Check the actual Mini App provider, not a standalone Safari browser tab.</p></div></div>
+  return `<div class="page-title"><div><div class="eyebrow">NIMIQ MAINNET · READ-ONLY CHECK</div><h1>Check an <em>existing payment.</em></h1><p>Compare a past transfer with a rent request. No wallet connection is required to check a public transaction.</p></div></div>
   <div class="wallet-panel"><div class="wallet-large">${icon('wallet')}</div><h2>${hostStatus==='connected'?'SDK provider detected':'Connect Nimiq Pay'}</h2><p class="wallet-copy">${hostStatus==='connected' ? (check?.consensus?'Nimiq Pay SDK responded. Its reported wallet network is shown below, separately from public mainnet RPC. Both must be checked before considering any payment.':'Provider found but consensus is not established.') : 'Open this app from Nimiq Pay → Mini Apps to authorize SDK access. Browsers alone do not inject the wallet provider.'}</p>
   <button id="check-host" class="primary" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='checking'?'Checking…':'Check host'} ${icon('arrow')}</button>
   ${hostStatus==='error'?`<div class="inline-alert">${icon('alert')} ${escapeHtml(hostMessage)}</div>`:''}
@@ -549,10 +549,10 @@ function independentAuditView(audit:PublicPaymentAudit):string {
 }
 function render():void {
   const p=activePortfolio();
-  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),collections:collectionsView(p),wallet:walletView() + standaloneLookupPanel() + g3Panel(p)})[selectedView];
+  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),collections:collectionsView(p),wallet:standaloneLookupPanel() + walletView() + g3Panel(p)})[selectedView];
   root!.innerHTML=`<div class="app-shell ${tenantRequest||publicAudit||publicAuditError?'tenant-shell':''}">
     <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>CYCLE III · PAY</small></span></a>
-      <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('collections','Collections','calendar-clock')}${navButton('wallet','Wallet & proof','wallet')}</nav>
+      <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent requests','receipt')}${navButton('collections','Due dates','calendar-clock')}${navButton('wallet','Check payment','wallet')}</nav>
       <div class="sidebar-bottom"><div class="side-note">${icon('shield')}<span>Non-custodial<br/><small>Evidence-first payments</small></span></div><div class="sidebar-footer">CYCLE III · PAY<br/>2026 BUILD</div></div>
     </aside><div class="main-wrap"><header class="topbar"><div class="mobile-brand">R<span>·</span><small>rentrail</small></div><span class="topbar-caption">${publicAudit?'RENT EVIDENCE':tenantRequest?'RENT PAYMENT':selectedView.toUpperCase()}</span><div class="topbar-right"><span class="label-chip">${preview?'EXAMPLE PREVIEW':'LOCAL WORKSPACE'}</span>${walletIndicator()}</div></header>
       <main class="main-content">${preview?`<div class="demo-banner">${icon('alert')} EXAMPLE PREVIEW ONLY — fictional units, no real payments. <button id="exit-preview">Exit preview</button></div>`:''}${content}${toast?`<div class="toast" role="status">${escapeHtml(toast)}</div>`:''}</main>
