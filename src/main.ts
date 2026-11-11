@@ -23,6 +23,7 @@ import { connectWallet, signWithWallet } from './wallet.ts';
 import { verifySignedMessage, rentRequestMessage, paymentClaimMessage, sameAddress } from './signature.ts';
 import { TENANT_KEY, emptyTenantMemory, entryFor, parseTenantMemory, recipientHistory, setPayment, upsertRequest, type TenantMemory } from './tenant-store.ts';
 import qrcode from 'qrcode-generator';
+import { leaseMessage, leaseMonths, leaseRequest, leaseChargeId, requestMatchesLease, validateLease, publicLease, type Lease } from './lease.ts';
 
 type View = 'overview' | 'properties' | 'charges' | 'collections' | 'wallet';
 const root = document.querySelector<HTMLDivElement>('#app');
@@ -144,6 +145,35 @@ const UNIT_TENANTS_KEY='rentrail-unit-tenants-v1';
 let unitTenants:Record<string,string>=(()=>{try{const d=JSON.parse(localStorage.getItem(UNIT_TENANTS_KEY)||'{}');return Object.fromEntries(Object.entries(d).filter(([k,v])=>/^[0-9a-f]{32}$/.test(k)&&typeof v==='string'&&isValidNimiqAddress(v))) as Record<string,string>;}catch{return {};}})();
 function saveUnitTenants(next:Record<string,string>):void{localStorage.setItem(UNIT_TENANTS_KEY,JSON.stringify(next));unitTenants=next;}
 
+// Monthly leases (landlord side). Each lease generates one rent request per month.
+const LEASES_KEY='rentrail-leases-v1';
+let leases:Lease[]=(()=>{try{const d=JSON.parse(localStorage.getItem(LEASES_KEY)||'[]');return Array.isArray(d)?d.flatMap(x=>{try{return [validateLease(x)];}catch{return [];}}).slice(0,500):[];}catch{return [];}})();
+function saveLeases(next:Lease[]):void{localStorage.setItem(LEASES_KEY,JSON.stringify(next));leases=next;}
+function leaseOfCharge(c:Charge):Lease|undefined{return leases.find(l=>l.unitId===c.unitId&&leaseChargeId(l.id,c.period)===c.id);}
+/** Creates this month's (and any missed months') requests for every lease. */
+function generateLeaseCharges():number{
+  let next=portfolio,created=0;
+  for(const l of leases){
+    if(!l.unitId||!next.units.some(u=>u.id===l.unitId))continue;
+    for(const period of leaseMonths(l,currentPeriod())){
+      const r=leaseRequest(l,period);
+      if(next.charges.some(c=>c.id===r.chargeId))continue;
+      try{next=addCharge(next,{id:r.chargeId,unitId:l.unitId,period,amountLuna:l.amountLuna,recipient:l.recipient,memo:r.memo,createdAt:new Date().toISOString(),...(l.title?{title:l.title}:{})});created++;}
+      catch{/* a manual request already exists for this unit and month */}
+    }
+  }
+  if(created){savePortfolio(next);portfolio=next;}
+  return created;
+}
+/** Tenant side: every month of a known lease up to now appears in My rent without a new link. */
+function refreshTenantLeaseMonths():void{
+  const seen=new Map<string,Lease>();
+  for(const e of tenantMemory.entries)if(e.request.lease&&requestMatchesLease(e.request))seen.set(e.request.lease.id,e.request.lease);
+  let m=tenantMemory;const now=new Date().toISOString();
+  for(const l of seen.values())for(const period of leaseMonths(l,currentPeriod()))m=upsertRequest(m,leaseRequest(l,period),now);
+  if(m!==tenantMemory)persistTenant(m);
+}
+
 const search = new URLSearchParams(window.location.search);
 if (search.has('audit')) {
   try {publicAudit = decodePaymentAudit(search.get('audit') || '');}
@@ -152,6 +182,7 @@ if (search.has('audit')) {
   try {
     tenantRequest = decodeRequest(search.get('pay') || '');
     persistTenant(upsertRequest(tenantMemory,tenantRequest,new Date().toISOString()));
+    refreshTenantLeaseMonths();
     const prior=entryFor(tenantMemory,tenantRequest.chargeId)?.payment;
     if(prior&&(prior.state==='sent'||prior.state==='confirmed')&&prior.hash){paidHash=prior.hash;tenantHash=prior.hash;payState=prior.state;}
     else if(prior?.state==='unknown')payState='unknown';
@@ -304,15 +335,15 @@ function whyNimiq():string{
     <div class="why-grid">${items.map(([i,t,d])=>`<article><span>${icon(i)}</span><h3>${escapeHtml(t)}</h3><p>${escapeHtml(d)}</p></article>`).join('')}</div></section>`;
 }
 function myRentPanel():string{
-  const entries=tenantMemory.entries;
+  const entries=tenantMemory.entries.slice().sort((a,b)=>b.request.period.localeCompare(a.request.period));
   const rows=entries.map(e=>{
     const st=e.payment?.state;
     const tag=st==='confirmed'?'<span class="tag green">Paid ✓</span>':st==='sent'?'<span class="tag amber">Confirming</span>':st==='unknown'?'<span class="tag red">Check wallet</span>':'<span class="tag neutral">To pay</span>';
     const url=new URL(window.location.pathname,window.location.origin);url.searchParams.set('pay',encodeRequest(e.request));
-    return `<a class="charge-row" href="${escapeHtml(url.toString())}"><div class="charge-avatar">${icon('home')}</div><div class="charge-title"><b>${escapeHtml(e.request.title||'Rent')}</b><span>${escapeHtml(monthLabel(e.request.period))}</span></div><div class="charge-amount"><strong>${formatNim(e.request.amountLuna)} NIM</strong>${tag}</div></a>`;
+    return `<a class="charge-row" href="${escapeHtml(url.toString())}"><div class="charge-avatar">${icon(e.request.lease?'calendar-clock':'home')}</div><div class="charge-title"><b>${escapeHtml(e.request.title||'Rent')}</b><span>${escapeHtml(monthLabel(e.request.period))}</span></div><div class="charge-amount"><strong>${formatNim(e.request.amountLuna)} NIM</strong>${tag}</div></a>`;
   }).join('');
   return `<section class="section" aria-label="My rent"><div class="section-heading"><div><div class="eyebrow">ON THIS DEVICE</div><h2>My rent</h2></div>${tenantMemory.wallet?`<span class="count mono">${escapeHtml(shortAddress(tenantMemory.wallet))}</span>`:''}</div>
-    ${rows||'<div class="empty"><h3>No rent requests yet</h3><p>Open the link your landlord sends you in Nimiq Pay. It will appear here with its payment and proof, month after month.</p></div>'}
+    ${rows||'<div class="empty"><h3>No rent requests yet</h3><p>Open the link your landlord sends you in Nimiq Pay. With a monthly lease, each new month appears here by itself.</p></div>'}
   </section>`;
 }
 function periodCockpit(p:Portfolio):string {
@@ -341,35 +372,59 @@ function syncBar():string{
   if(preview)return '';
   return `<div class="sync-bar" role="status"><span>${syncBusy?'<span class="spinner" aria-hidden="true"></span> Looking for rent payments on Nimiq mainnet…':escapeHtml(syncMessage||(lastSyncAt?'Up to date.':'Payments to your address are detected automatically.'))}</span><button id="sync-payments" class="tertiary" type="button" ${syncBusy||!portfolio.charges.length?'disabled':''}>Sync payments</button></div>`;
 }
+function leasePanel(p:Portfolio):string{
+  const rows=leases.filter(l=>l.unitId&&p.units.some(u=>u.id===l.unitId)).map(l=>{
+    const u=p.units.find(x=>x.id===l.unitId)!;const pr=p.properties.find(x=>x.id===u.propertyId);
+    const signed=!!l.sig&&verifySignedMessage(leaseMessage(l),l.sig).valid;
+    return `<div class="collection-row"><div><strong>${escapeHtml(pr?.name||'')} · ${escapeHtml(u.label)}</strong><small>${formatNim(l.amountLuna)} NIM / month · due day ${l.dueDay} · since ${escapeHtml(l.start)} · ${signed?'✓ signed':'unsigned'}</small></div><div class="row-actions">${signed||preview?'':`<button type="button" class="tertiary" data-sign-lease="${escapeHtml(l.id)}">Sign</button>`}<button type="button" class="tertiary" data-share-lease="${escapeHtml(l.id)}">Send lease link</button><button type="button" class="tertiary danger-text" data-end-lease="${escapeHtml(l.id)}">End</button></div></div>`;
+  }).join('');
+  return `<section class="panel lease-panel" aria-label="Monthly leases"><div class="section-heading"><div><div class="eyebrow">RECURRING</div><h2>Monthly leases</h2></div><span class="count">${leases.length}</span></div>
+    <p class="form-hint">Sign a lease once. RentRail creates the request every month, your tenant sees the next rent in Nimiq Pay without a new link, and payments are detected automatically.</p>
+    <form id="lease-form" class="form-stack">
+      <label>Unit<select name="unitId" required>${p.units.filter(u=>!leases.some(l=>l.unitId===u.id)).map(u=>`<option value="${escapeHtml(u.id)}">${normalizeLabel(p.properties.find(b=>b.id===u.propertyId)?.name||'')} / ${normalizeLabel(u.label)}</option>`).join('')}</select></label>
+      <div class="form-duo"><label>Monthly rent (NIM)<input name="amount" inputmode="decimal" placeholder="1250.00" required/></label><label>Due day<input name="dueDay" type="number" min="1" max="28" value="1" required/></label></div>
+      <label>First month<input name="start" type="month" value="${currentPeriod()}" required/></label>
+      <button class="primary" type="submit" ${preview||!landlordWallet||!p.units.some(u=>!leases.some(l=>l.unitId===u.id))?'disabled':''}>${icon('calendar-clock')} ${inNimiqPay?'Create and sign lease':'Create lease'}</button>
+      ${landlordWallet?'':'<p class="form-hint">Connect Nimiq Pay on the Overview page first: the lease pays your wallet and is signed by it.</p>'}
+    </form>
+    <div class="collection-list">${rows}</div>
+  </section>`;
+}
 function renewalPlanner(p:Portfolio):string {
-  const source=p.charges.filter(c=>c.period===workspaceMonth);
+  const source=p.charges.filter(c=>c.period===workspaceMonth&&!leaseOfCharge(c));
   const next=nextMonth(workspaceMonth);
   const eligible=source.filter(c=>!p.charges.some(x=>x.unitId===c.unitId&&x.period===next));
   const matches=nextPeriodPreview?.period===workspaceMonth && nextPeriodPreview.count===eligible.length;
-  return `<section class="renewal-panel" aria-label="Next-month invoice planner">
-    <div class="eyebrow">NEXT MONTH</div>
-    <h2>Prepare the next month</h2>
-    <p>Copy every ${escapeHtml(workspaceMonth)} request into ${escapeHtml(next)} in one step. Each new request gets a new RR1 reference.</p>
+  return `${leasePanel(p)}<details class="panel details-panel renewal-panel" aria-label="Next-month planner"><summary>One-off requests: copy this month to next month</summary>
+    <p class="form-hint">Copy every ${escapeHtml(workspaceMonth)} request that is not part of a lease into ${escapeHtml(next)}. Each new request gets a new RR1 reference.</p>
     <div class="period-filters"><label>Source month<input id="renewal-month" type="month" value="${escapeHtml(workspaceMonth)}"/></label></div>
     <div class="renewal-stats"><strong>${eligible.length}</strong> request${eligible.length===1?'':'s'} to create · ${source.length-eligible.length} already exist for ${escapeHtml(next)}</div>
     <div class="renewal-actions">
       <button id="preview-renewal" class="tertiary" type="button" ${preview||eligible.length===0?'disabled':''}>Preview</button>
       ${matches?`<button id="confirm-renewal" class="primary" type="button" ${preview?'disabled':''}>Create ${eligible.length} request${eligible.length===1?'':'s'} ${icon('arrow')}</button>`:''}
     </div>
-    ${matches?'<p class="inline-alert">Only ${escapeHtml(next)} is created. Existing requests are kept.</p>':''}
-  </section>`;
+  </details>`;
 }
 function emptyState(title:string, description:string, goto:View, action:string):string {
   return `<div class="empty"><div class="empty-icon">${icon('building')}</div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(description)}</p><button class="primary" type="button" data-nav="${goto}">${escapeHtml(action)} ${icon('arrow')}</button></div>`;
+}
+function requestForCharge(c:Charge):SharedRequest{
+  const lease=leaseOfCharge(c);
+  return lease?leaseRequest(lease,c.period):shareableRequest(c);
+}
+function chargeSigned(c:Charge):boolean{
+  const lease=leaseOfCharge(c);
+  if(lease)return !!lease.sig&&verifySignedMessage(leaseMessage(lease),lease.sig).valid;
+  return !!c.sig&&verifySignedMessage(rentRequestMessage(c),c.sig).valid;
 }
 function chargeRow(p:Portfolio,c:Charge,evidence:Record<string,TransferEvidence[]>=proofEvidence(p)):string {
   const unit = p.units.find(u=>u.id===c.unitId);
   const property = p.properties.find(b=>b.id===unit?.propertyId);
   const calculated=projectCharge(c,evidence[c.id]??[],p.submissions);
   const due=calculated.status==='PARTIALLY_FUNDED'?`<small class="due-note">${formatNim(calculated.dueLuna)} NIM left</small>`:'';
-  const signedOk=!!c.sig&&verifySignedMessage(rentRequestMessage(c),c.sig).valid;
-  const sign=preview?'':signedOk?'<span class="sig-badge" title="Signed with your Nimiq Pay wallet">✓ Signed</span>':`<button class="tiny warn" type="button" data-sign="${escapeHtml(c.id)}">${icon('shield')}<span> Sign</span></button>`;
-  return `<div class="charge-row"><div class="charge-avatar">${icon('home')}</div><div class="charge-title"><b>${normalizeLabel(unit?.label||'Unknown unit')}</b><span>${normalizeLabel(property?.name||'Unknown property')} · ${escapeHtml(c.period)}</span></div><div class="charge-amount"><strong>${formatNim(c.amountLuna)} NIM</strong><span class="tag ${statusClass(calculated.status)}">${statusText(calculated.status)}</span>${due}</div>${sign}<button class="tiny" type="button" data-share="${escapeHtml(c.id)}" ${preview?'disabled title="Sample data cannot be shared"':''}>${icon('link')}<span> Send</span></button></div>`;
+  const lease=leaseOfCharge(c);
+  const sign=preview?'':chargeSigned(c)?`<span class="sig-badge" title="Signed with your Nimiq Pay wallet">✓ ${lease?'Lease':'Signed'}</span>`:lease?'<span class="sig-badge warn">Lease unsigned</span>':`<button class="tiny warn" type="button" data-sign="${escapeHtml(c.id)}">${icon('shield')}<span> Sign</span></button>`;
+  return `<div class="charge-row"><div class="charge-avatar">${icon(lease?'calendar-clock':'home')}</div><div class="charge-title"><b>${normalizeLabel(unit?.label||'Unknown unit')}</b><span>${normalizeLabel(property?.name||'Unknown property')} · ${escapeHtml(c.period)}</span></div><div class="charge-amount"><strong>${formatNim(c.amountLuna)} NIM</strong><span class="tag ${statusClass(calculated.status)}">${statusText(calculated.status)}</span>${due}</div>${sign}<button class="tiny" type="button" data-share="${escapeHtml(c.id)}" ${preview?'disabled title="Sample data cannot be shared"':''}>${icon('link')}<span> Send</span></button></div>`;
 }
 function propertiesView(p:Portfolio):string {
   const cards=p.properties.map(property=>{
@@ -437,7 +492,7 @@ function fiatContextPanel():string {
   </section>`;
 }
 function chargesView(p:Portfolio):string {
-  const unsigned=preview?0:p.charges.filter(c=>!c.sig).length;
+  const unsigned=preview?0:p.charges.filter(c=>!leaseOfCharge(c)&&!chargeSigned(c)).length;
   const recipientField=landlordWallet
     ?`<div class="locked-field"><small>Paid to your Nimiq Pay wallet</small><strong class="mono">${escapeHtml(landlordWallet)}</strong></div><details><summary class="form-hint">Use a different address</summary><textarea name="recipient" rows="2" placeholder="NQ.." spellcheck="false"></textarea><p class="form-hint">Requests to another address cannot be signed by your wallet; tenants will see them as unsigned.</p></details>`
     :`<label>Receiving address<textarea name="recipient" rows="2" placeholder="NQ.." spellcheck="false" required></textarea></label><p class="form-hint">Tip: connect Nimiq Pay on the Overview page so your wallet is used and every request is signed.</p>`;
@@ -514,6 +569,13 @@ function decodeRequest(encoded:string):SharedRequest {
 }
 type LinkTrust={level:'signed'|'unsigned'|'tampered';text:string};
 function linkTrust(request:SharedRequest):LinkTrust{
+  if(request.lease){
+    if(!requestMatchesLease(request))return {level:'tampered',text:'This month does not match its lease. Do not pay. Ask your landlord for a new link.'};
+    if(!request.lease.sig)return {level:'unsigned',text:'This lease is not signed by a wallet. Confirm the receiving address with your landlord before paying.'};
+    const check=verifySignedMessage(leaseMessage(request.lease),request.lease.sig);
+    if(!check.valid||!sameAddress(check.signer,request.recipient))return {level:'tampered',text:'This lease was changed after the landlord signed it. Do not pay. Ask your landlord for a new link.'};
+    return {level:'signed',text:`Monthly lease signed with Nimiq Pay by the owner of the receiving address: ${formatNim(request.lease.amountLuna)} NIM due on day ${request.lease.dueDay} of each month.`};
+  }
   if(!request.sig)return {level:'unsigned',text:'This request is not signed by a wallet. Confirm the receiving address with your landlord before paying.'};
   const check=verifySignedMessage(rentRequestMessage(request),request.sig);
   if(!check.valid||!sameAddress(check.signer,request.recipient))return {level:'tampered',text:'This link was changed after the landlord signed it (address, amount, month or reference). Do not pay. Ask your landlord for a new link.'};
@@ -547,6 +609,12 @@ function tenantPaySection(request:SharedRequest):string{
     ${payMessage?`<div class="inline-alert" role="status">${escapeHtml(payMessage)}</div>`:''}
     <p class="pay-note">You confirm the payment in Nimiq Pay. RentRail never holds your funds or keys.</p>`;
 }
+function otherOpenMonths(request:SharedRequest):string{
+  if(!request.lease)return '';
+  const open=tenantMemory.entries.filter(e=>e.request.lease?.id===request.lease!.id&&e.request.chargeId!==request.chargeId&&e.payment?.state!=='confirmed'&&e.payment?.state!=='sent');
+  if(!open.length)return '';
+  return `<div class="other-months"><strong>Also open on this lease</strong>${open.sort((a,b)=>a.request.period.localeCompare(b.request.period)).map(e=>{const u=new URL(window.location.pathname,window.location.origin);u.searchParams.set('pay',encodeRequest(e.request));return `<a href="${escapeHtml(u.toString())}">${escapeHtml(monthLabel(e.request.period))} · ${formatNim(e.request.amountLuna)} NIM →</a>`;}).join('')}</div>`;
+}
 function tenantView(request:SharedRequest):string {
   const addressOk=isValidNimiqAddress(request.recipient);
   const trust=linkTrust(request);
@@ -564,6 +632,7 @@ function tenantView(request:SharedRequest):string {
       ${tenantRecipientComparison?`<div role="status" class="inline-alert">${escapeHtml(tenantRecipientComparison)}</div>`:''}
     </details>
     ${tenantPaySection(request)}
+    ${otherOpenMonths(request)}
   </div>${tenantEvidencePanel(request)}<p class="checkout-foot"><a href="/">My rent on RentRail</a></p>${payState==='confirmed'&&paidHash?receiptMarkup(tenantAudit(request,paidHash),receiptResult):''}</div>`;
 }
 function tenantAudit(request:SharedRequest,hash:string):PublicPaymentAudit{
@@ -710,9 +779,18 @@ function bindEvents():void {
   const chargeForm=root!.querySelector<HTMLFormElement>('#charge-form');
   chargeForm?.addEventListener('submit',e=>{e.preventDefault();void onCreateCharge(chargeForm);});
   root!.querySelectorAll<HTMLButtonElement>('[data-sign]').forEach(b=>b.addEventListener('click',()=>void onSignCharges([b.dataset.sign||''])));
-  root!.querySelector('#sign-all')?.addEventListener('click',()=>void onSignCharges(portfolio.charges.filter(c=>!c.sig).map(c=>c.id)));
+  root!.querySelector('#sign-all')?.addEventListener('click',()=>void onSignCharges(portfolio.charges.filter(c=>!leaseOfCharge(c)&&!chargeSigned(c)).map(c=>c.id)));
   root!.querySelector('#connect-wallet')?.addEventListener('click',()=>void onConnectWallet());
   root!.querySelector('#sync-payments')?.addEventListener('click',()=>void onSyncPayments());
+  const leaseForm=root!.querySelector<HTMLFormElement>('#lease-form');
+  leaseForm?.addEventListener('submit',e=>{e.preventDefault();void onCreateLease(leaseForm);});
+  root!.querySelectorAll<HTMLButtonElement>('[data-sign-lease]').forEach(b=>b.addEventListener('click',()=>void onSignLease(b.dataset.signLease||'')));
+  root!.querySelectorAll<HTMLButtonElement>('[data-share-lease]').forEach(b=>b.addEventListener('click',()=>void onShareLease(b.dataset.shareLease||'')));
+  root!.querySelectorAll<HTMLButtonElement>('[data-end-lease]').forEach(b=>b.addEventListener('click',()=>{
+    const l=leases.find(x=>x.id===b.dataset.endLease);if(!l)return;
+    if(!window.confirm('End this lease? No new monthly requests will be created. Past requests and payments stay in your ledger.'))return;
+    try{saveLeases(leases.filter(x=>x.id!==l.id));success('Lease ended.');}catch{error('Browser storage did not accept this change.');}
+  }));
   root!.querySelector('#disconnect-wallet')?.addEventListener('click',()=>{if(window.confirm('Use a different Nimiq Pay wallet? Existing requests keep their signatures.')){saveLandlordWallet(null);render();}});
   root!.querySelector<HTMLInputElement>('#ack-unsigned')?.addEventListener('change',e=>{unsignedAck=(e.target as HTMLInputElement).checked;render();});
   root!.querySelector<HTMLInputElement>('#ack-changed')?.addEventListener('change',e=>{changedAddressAck=(e.target as HTMLInputElement).checked;render();});
@@ -727,7 +805,7 @@ function bindEvents():void {
     const charge=portfolio.charges.find(c=>c.id===button.dataset.share);
     if(!charge||preview)return;
     const url=new URL(window.location.pathname,window.location.origin);
-    url.searchParams.set('pay',encodeRequest(shareableRequest(charge)));
+    url.searchParams.set('pay',encodeRequest(requestForCharge(charge)));
     const unit=portfolio.units.find(u=>u.id===charge.unitId);
     await shareOrCopy(url.toString(),`Rent ${monthLabel(charge.period)}${unit?` · ${unit.label}`:''}: ${formatNim(charge.amountLuna)} NIM. Open in Nimiq Pay to pay:`,'Rent request link copied. Send it to your tenant.');
   }));
@@ -803,7 +881,7 @@ function bindEvents():void {
     if(!line||preview)return;
     const charge=portfolio.charges.find(c=>c.id===line.chargeId);
     let draft=reminderDraft(line);
-    if(charge){const url=new URL(window.location.pathname,window.location.origin);url.searchParams.set('pay',encodeRequest(shareableRequest(charge)));draft+=`\nPay in Nimiq Pay: ${url.toString()}`;}
+    if(charge){const url=new URL(window.location.pathname,window.location.origin);url.searchParams.set('pay',encodeRequest(requestForCharge(charge)));draft+=`\nPay in Nimiq Pay: ${url.toString()}`;}
     try{
       if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(draft);success('Reminder copied with the payment link. Nothing was sent.');}
       else window.prompt('Copy this reminder',draft);
@@ -1112,3 +1190,46 @@ async function onSyncPayments(quiet=false):Promise<void>{
   finally{syncBusy=false;render();}
 }
 if(!tenantRequest&&!publicAudit&&!publicAuditError&&portfolio.charges.length)setTimeout(()=>void onSyncPayments(true),800);
+
+async function onCreateLease(form:HTMLFormElement):Promise<void>{
+  let lease:Lease;
+  try{
+    if(!landlordWallet)throw Error('Connect Nimiq Pay first.');
+    const amountLuna=parseNim(formValue(form,'amount'));
+    const issue=payableAmountIssue(amountLuna);if(issue)throw Error(issue);
+    const unitId=formValue(form,'unitId');
+    const unit=portfolio.units.find(u=>u.id===unitId);const property=portfolio.properties.find(x=>x.id===unit?.propertyId);
+    if(!unit)throw Error('Choose a unit.');
+    if(leases.some(l=>l.unitId===unitId))throw Error('This unit already has a lease.');
+    lease=validateLease({v:1,id:randomId(),recipient:landlordWallet,amountLuna,start:formValue(form,'start'),dueDay:Number(formValue(form,'dueDay')),unitId,...(property?{title:`${property.name} · ${unit.label}`.slice(0,80)}:{})});
+  }catch(err){error(explainHostError(err));return;}
+  if(inNimiqPay){
+    try{const {signed}=await signWithWallet(leaseMessage(publicLease(lease)),lease.recipient);lease={...lease,sig:signed};}
+    catch(err){error('Lease saved but not signed. '+(err instanceof Error?err.message:''));}
+  }
+  try{
+    saveLeases([...leases,lease]);
+    if(lease.unitId)try{const next={...dueDays,[lease.unitId]:lease.dueDay};localStorage.setItem(DUE_STORAGE_KEY,JSON.stringify(next));dueDays=next;}catch{/* optional */}
+    const created=generateLeaseCharges();
+    success(`Lease created${lease.sig?' and signed':''}. ${created} monthly request${created===1?'':'s'} ready. Tap "Send lease link".`);
+  }catch(err){error(explainHostError(err));}
+}
+async function onSignLease(id:string):Promise<void>{
+  const l=leases.find(x=>x.id===id);if(!l)return;
+  try{const {signed}=await signWithWallet(leaseMessage(publicLease(l)),l.recipient);saveLeases(leases.map(x=>x.id===id?{...x,sig:signed}:x));success('Lease signed.');}
+  catch(err){error(err instanceof Error?err.message:'Signing failed.');}
+}
+async function onShareLease(id:string):Promise<void>{
+  const l=leases.find(x=>x.id===id);if(!l)return;
+  const months=leaseMonths(l,currentPeriod());
+  const period=months.length?months[months.length-1]:l.start;
+  const url=new URL(window.location.pathname,window.location.origin);
+  url.searchParams.set('pay',encodeRequest(leaseRequest(l,period)));
+  await shareOrCopy(url.toString(),`Your monthly rent on RentRail${l.title?` (${l.title})`:''}: ${formatNim(l.amountLuna)} NIM, due on day ${l.dueDay}. Open in Nimiq Pay:`,'Lease link copied. Send it to your tenant once: every month will appear in their app.');
+}
+{
+  const created=generateLeaseCharges();
+  const before=tenantMemory;
+  if(!tenantRequest)refreshTenantLeaseMonths();
+  if(created||before!==tenantMemory)render();
+}

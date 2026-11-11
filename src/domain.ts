@@ -65,6 +65,8 @@ export interface SharedRequest {
   chargeId: string;
   title?: string;
   sig?: Signed;
+  /** Present when this month comes from a signed monthly lease (see lease.ts). */
+  lease?: import('./lease.ts').Lease;
 }
 const HEX = (n: number) => new RegExp(`^[0-9a-f]{${n}}$`);
 export function validTitle(v: unknown): v is string {
@@ -197,6 +199,7 @@ export function validateSharedRequest(raw: unknown): SharedRequest {
   const out: SharedRequest = { v: 1, chargeId: x.chargeId, memo: x.memo, recipient: normalizeAddress(x.recipient), amountLuna: x.amountLuna, period: x.period };
   if (x.title !== undefined) { if (!validTitle(x.title)) throw new Error('Invalid request title.'); out.title = x.title; }
   if (x.sig !== undefined) { if (!validSigned(x.sig)) throw new Error('Invalid signature format.'); out.sig = { publicKey: x.sig.publicKey, signature: x.sig.signature }; }
+  if (x.lease !== undefined) out.lease = leaseValidator(x.lease);
   return out;
 }
 /** Attaches (or replaces) the landlord signature on an existing request. */
@@ -205,3 +208,7 @@ export function setChargeSignature(p: Portfolio, chargeId: string, sig: Signed):
   if (!p.charges.some(c => c.id === chargeId)) throw new Error('Unknown charge.');
   return { ...p, charges: p.charges.map(c => c.id === chargeId ? { ...c, sig } : c) };
 }
+
+// Set by lease.ts to avoid a circular import at module load.
+let leaseValidator: (raw: unknown) => import('./lease.ts').Lease = () => { throw new Error('Leases are not supported here.'); };
+export function registerLeaseValidator(fn: typeof leaseValidator): void { leaseValidator = fn; }
