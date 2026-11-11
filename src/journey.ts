@@ -65,3 +65,15 @@ export const statusExplanations=[
   {title:'Matched on-chain',description:'One public mainnet node reported the correct recipient, amount, reference and a later finality block.'},
   {title:'Needs review',description:'The payment is missing, partial, mismatched or uncertain. Ask a human to investigate.'},
 ] as const;
+
+/** A node's reported transfer may be partial; never label it fully settled. */
+export type ManualProofState='EXACT_NODE_MATCH'|'PARTIAL_NODE_MATCH'|'REVIEW_REQUIRED';
+export function describeManualProof(expectedLuna:number,observedLuna:number|undefined,state:string):
+  {kind:ManualProofState;remainingLuna:number|null;heading:string} {
+  if(!Number.isSafeInteger(expectedLuna)||expectedLuna<=0)return {kind:'REVIEW_REQUIRED',remainingLuna:null,heading:'Invalid requested amount — review required'};
+  if(state!=='FINAL_MATCHED'||typeof observedLuna!=='number'||!Number.isSafeInteger(observedLuna)||observedLuna<=0||observedLuna>expectedLuna)
+    return {kind:'REVIEW_REQUIRED',remainingLuna:null,heading:'No verified match — review this payment'};
+  if(observedLuna<expectedLuna)
+    return {kind:'PARTIAL_NODE_MATCH',remainingLuna:expectedLuna-observedLuna,heading:'A partial transfer matched the request'};
+  return {kind:'EXACT_NODE_MATCH',remainingLuna:0,heading:'An exact transfer matched the request'};
+}
