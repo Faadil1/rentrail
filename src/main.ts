@@ -477,10 +477,15 @@ function tenantView(request:SharedRequest):string {
     <div class="detail"><span>Public memo</span><strong class="mono">${escapeHtml(request.memo)}</strong></div>
     <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(request.chargeId.slice(0,10))}…</strong></div>
     <div class="inline-alert">${icon('alert')} Link contents can be altered by anyone sharing it. Verify the recipient with your landlord independently. This request does not prove identity or a legal debt.</div>
+    ${!paymentEnabled?`<section class="tenant-readonly-steps" aria-label="Understand this rent request"><h2>What should I do next?</h2>
+      <div class="tenant-readonly-list"><div><b>1 · Check the request</b><p>Confirm the month and the NIM amount. Compare the receiving address with your landlord through another trusted channel.</p></div>
+      <div><b>2 · Already paid?</b><p>Find the public transaction hash in your wallet. Use the form below to check the exact amount, receiver and `RR1` reference on mainnet.</p></div>
+      <div><b>3 · Need to pay?</b><p>This public RentRail preview cannot initiate a transfer. Do not treat this unsigned request link as permission or proof of the landlord's identity.</p></div></div></section>`:''}
+    <details class="tenant-technical" ${paymentEnabled?'open':''}><summary>Technical wallet checks ${paymentEnabled?'required for the approved pilot':'(optional reference)'}</summary>
     <div class="smoke-panel" aria-label="Controlled mainnet test safety">
       <div class="eyebrow">G2 · REAL MONEY SAFETY CHECK</div>
-      <h3>One small, controlled transaction</h3>
-      <p>This is an approved fictional trial, not residential rent. Only <strong>${formatNim(PILOT_LUNA)} NIM</strong> (500 Luna) to the explicitly authorized wallet B, plus a fee chosen by Nimiq Pay, can be requested. If anything differs in the native dialog, cancel. This browser-local attempt lock is NOT a cross-device spending limit.</p>
+      <h3>${paymentEnabled?'One small, controlled transaction':'Historical one-off pilot — closed'}</h3>
+      <p>${paymentEnabled?`This isolated environment was built for a single approved fictional test of <strong>${formatNim(PILOT_LUNA)} NIM</strong> (500 Luna) to B, plus wallet fees. Cancel if native details differ. Its browser-local attempt lock is not global.`:'The historical 500-Luna pilot was completed, and this public edition is intentionally read-only. You cannot use it to send or repeat any NIM payment. Use the read-only checker below to inspect a transfer you already made.'}</p>
       <div class="host-report"><div><span>Wallet network</span><b>${escapeHtml(walletNetwork.toUpperCase())}</b></div><div><span>Independent public RPC</span><b>${escapeHtml(rpcNetworkLabel)}</b></div><div><span>SDK height</span><b>${check?.blockHeight??'Unknown'}</b></div><div><span>RPC height</span><b>${rpcNetwork?.headHeight??'Unknown'}</b></div></div>
       <button class="tertiary full" id="tenant-check-host" type="button" ${hostStatus==='checking'?'disabled':''}>${hostStatus==='connected'?'Recheck Nimiq Pay':'Check Nimiq Pay host'}</button>
       <button class="tertiary full" id="tenant-check-rpc" type="button" ${rpcChecking?'disabled':''}>${rpcChecking?'Checking RPC…':'Check independent mainnet RPC'}</button>
@@ -493,7 +498,7 @@ function tenantView(request:SharedRequest):string {
       <div class="consent-row"><label class="consent"><input id="ack-payment" type="checkbox" ${paymentAcknowledged?'checked':''}/> I will review amount, recipient, fee and memo again in the native wallet approval dialog. A hash is not a rent receipt.</label></div>
       <button id="send-payment" class="primary full" type="button" ${gate.allowed?'':'disabled'}>${paymentBusy?'Waiting for wallet…':submittedHash?'Submitted — not verified':outcomeUnknown?'Outcome unknown — do not retry':paymentEnabled?'Request Nimiq Pay native approval':'Payments locked — read-only'} ${icon('arrow')}</button>
       <div class="checkout-status" role="status">${hostMessage?escapeHtml(hostMessage):submittedHash?'Wallet returned a transaction hash; check its amount and finality independently. Do NOT retry.':outcomeUnknown?'A wallet request occurred but its outcome remains uncertain. Do NOT retry.':paymentBusy?'Waiting for the native Nimiq Pay wallet response…':'No native wallet transfer initiated from this page.'}</div>
-    </div>
+    </div></details>
     ${submittedHash?`<div class="pending-result"><strong>Submitted, NOT verified as paid</strong><span class="mono">${escapeHtml(submittedHash)}</span><p>Hash is not proof of payment. Paste/recheck the hash in the read-only verification panel below; do not retry if its status is uncertain.</p></div>`:''}
     ${outcomeUnknown?`<div class="pending-result"><strong>Outcome unknown — DO NOT retry yet</strong><p>Inspect Nimiq Pay transaction history and independently verify on-chain before attempting another payment.</p></div>`:''}
   </div>${tenantEvidencePanel(request)}<p class="checkout-foot">RentRail is non-custodial. Payment approval happens inside Nimiq Pay, never in this page.</p></div>`;
