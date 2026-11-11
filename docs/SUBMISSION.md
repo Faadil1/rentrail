@@ -22,7 +22,7 @@ While testing we found that the Nimiq Pay confirmation sheet rounds amounts to 2
 
 Built for the payment people make every month.
 
-_Word count: 226._
+_Word count: 221._
 
 ## Before submitting (human)
 
