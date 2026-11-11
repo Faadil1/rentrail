@@ -189,9 +189,7 @@ function walletIndicator(): string {
   return `<div class="wallet-state"><span class="status-light ${hostStatus==='connected'&&check?.consensus?'online':''}"></span><span>${escapeHtml(description)}</span></div>`;
 }
 function audienceNavigation():string{
-  const tabs:[
-    {id:Audience,label:string,detail:string}
-  ]=[
+  const tabs: Array<{id:Audience,label:string,detail:string}> = [
     {id:'owner',label:'I manage rentals',detail:'Prepare monthly rent and follow up'},
     {id:'tenant',label:'I pay rent',detail:'Understand a request and check my transfer'},
     {id:'explorer',label:'Show me RentRail',detail:'Try a fictional workspace safely'}
