@@ -220,7 +220,7 @@ function guidedJourney(p:Portfolio):string{
     <ol class="journey-steps">${steps.map((step,i)=>`<li class="journey-step">
       <span class="journey-number">${i+1}</span>
       <div class="journey-step-copy"><strong>${escapeHtml(step.title)}</strong><p>${escapeHtml(step.description)}</p>
-      <small>${step.state==='LOCAL_DONE'?'Local setup complete — not proof of rent paid':step.state==='GUIDANCE_ONLY'?'Safety guidance':step.state==='READY'?'Next step':''}</small></div>
+      <small>${step.state==='LOCAL_DONE'?(i===4?'Single-node match observed in this session — not a rent receipt':'Local setup complete — not proof of rent paid'):step.state==='GUIDANCE_ONLY'?'Safety guidance':step.state==='READY'?'Next step':''}</small></div>
       <button class="journey-step-action" type="button" data-journey="${i}">${escapeHtml(step.label)} ${icon('arrow')}</button>
       </li>`).join('')}</ol>
     ${audience==='tenant'?'<div id="tenant-help" class="tenant-help"><strong>Important for tenants</strong><p>RentRail cannot look up private rent obligations for you. Ask your landlord to share your request link. Check the recipient through a separate trusted conversation; the NQ checksum only detects typos. If you have already transferred NIM, use “Verify my transaction” to read a public blockchain node. The public RentRail demo does not initiate a payment.</p></div>':''}
