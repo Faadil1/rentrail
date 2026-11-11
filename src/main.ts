@@ -479,7 +479,7 @@ function tenantView(request:SharedRequest):string {
     <div class="inline-alert">${icon('alert')} Link contents can be altered by anyone sharing it. Verify the recipient with your landlord independently. This request does not prove identity or a legal debt.</div>
     ${!paymentEnabled?`<section class="tenant-readonly-steps" aria-label="Understand this rent request"><h2>What should I do next?</h2>
       <div class="tenant-readonly-list"><div><b>1 · Check the request</b><p>Confirm the month and the NIM amount. Compare the receiving address with your landlord through another trusted channel.</p></div>
-      <div><b>2 · Already paid?</b><p>Find the public transaction hash in your wallet. Use the form below to check the exact amount, receiver and `RR1` reference on mainnet.</p></div>
+      <div><b>2 · Already paid?</b><p>Find the public transaction hash in your wallet. Use the form below to check the exact amount, receiver and RR1 reference on mainnet.</p></div>
       <div><b>3 · Need to pay?</b><p>This public RentRail preview cannot initiate a transfer. Do not treat this unsigned request link as permission or proof of the landlord's identity.</p></div></div></section>`:''}
     <details class="tenant-technical" ${paymentEnabled?'open':''}><summary>Technical wallet checks ${paymentEnabled?'required for the approved pilot':'(optional reference)'}</summary>
     <div class="smoke-panel" aria-label="Controlled mainnet test safety">
