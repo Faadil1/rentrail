@@ -1,6 +1,6 @@
 import {
   addCharge, assertPeriod, makeMemo, projectCharge,
-  type Portfolio, type Charge, type ChargeViewStatus,
+  type Portfolio, type Charge, type ChargeViewStatus, type TransferEvidence,
 } from './domain.ts';
 
 export interface MonthLine {
@@ -19,6 +19,10 @@ export interface MonthSnapshot {
   unitsWithoutCharge: number;
   charges: number;
   awaitingProof: number;
+  /** Luna matched on-chain this period (excluding requests under review). */
+  paidLuna: number;
+  /** Requests fully paid and confirmed on-chain this period. */
+  paidCount: number;
   lines: MonthLine[];
 }
 
@@ -68,21 +72,23 @@ export function planNextPeriod(
  * Trust note: snapshot summarizes local off-chain obligations and unverified wallet sends,
  * never an independent claim about cash received or legal rent payment.
  */
-export function monthSnapshot(p:Portfolio, period:string, propertyId=''):MonthSnapshot {
+export function monthSnapshot(p:Portfolio, period:string, propertyId='', evidence:Record<string,TransferEvidence[]>={}):MonthSnapshot {
   assertPeriod(period);
   if(propertyId && !p.properties.some(x=>x.id===propertyId))throw Error('Unknown property filter.');
   const units=p.units.filter(u=>!propertyId||u.propertyId===propertyId);
   const unitIds=new Set(units.map(u=>u.id));
   const selected=p.charges.filter(c=>c.period===period && unitIds.has(c.unitId));
-  let expectedLuna=0,outstandingLuna=0,awaitingProof=0;
+  let expectedLuna=0,outstandingLuna=0,awaitingProof=0,paidLuna=0,paidCount=0;
   const lines:MonthLine[]=selected.map(charge=>{
     if(!Number.isSafeInteger(expectedLuna+charge.amountLuna))throw Error('Portfolio amount exceeds safe integer precision.');
     expectedLuna+=charge.amountLuna;
-    const projection=projectCharge(charge,[],p.submissions);
-    // No rent is credited without independent verified evidence.
+    // Only proofs matched on-chain (recipient, amount, reference, finality) reduce what is due.
+    const projection=projectCharge(charge,evidence[charge.id]??[],p.submissions);
     if(!Number.isSafeInteger(outstandingLuna+projection.dueLuna))throw Error('Outstanding amount exceeds safe integer precision.');
     outstandingLuna+=projection.dueLuna;
     if(projection.status==='SUBMITTED_UNVERIFIED')awaitingProof++;
+    if(projection.status==='PAID_ONCHAIN_VERIFIED')paidCount++;
+    if(projection.status!=='REVIEW_REQUIRED')paidLuna+=projection.creditedLuna;
     const unit=units.find(u=>u.id===charge.unitId);
     const property=p.properties.find(x=>x.id===unit?.propertyId);
     return {charge, propertyId:property?.id??'',propertyName:property?.name??'Unknown property',
@@ -92,5 +98,5 @@ export function monthSnapshot(p:Portfolio, period:string, propertyId=''):MonthSn
   const billed=new Set(selected.map(c=>c.unitId));
   return {period,expectedLuna,outstandingLuna,activeUnits:units.length,
     unitsWithoutCharge:units.filter(u=>!billed.has(u.id)).length,
-    charges:selected.length,awaitingProof,lines};
+    charges:selected.length,awaitingProof,paidLuna,paidCount,lines};
 }

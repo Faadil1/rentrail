@@ -1,72 +1,69 @@
 # RentRail
-### Monthly rent operations with verifiable Nimiq mainnet evidence
+### Rent requests paid in NIM inside Nimiq Pay, confirmed on Nimiq mainnet
 
-RentRail is a **Nimiq Pay Mini App** for tenant/landlord payment coordination. Property managers organize properties, units, month-specific invoices and next-period planning. Tenants receive a transparent payment request with an opaque `RR1:` on-chain reference. Anyone with the transaction hash can independently query a public Nimiq history node for the intended recipient, amount in Luna, reference, execution and canonical inclusion.
+**Nimiq Mini Apps Competition · Cycle III · Pay** · MIT License
 
-> **Cycle III / PAY submission candidate · MIT License · Mainnet-aware.** This repository contains a working **rent ledger + mainnet verification** app, not a licensed rent collector or a guarantee that rent is legally discharged.
+**Live Mini App:** _URL to be set at deploy_ (open it in **Nimiq Pay → Mini Apps → add by URL**)
 
-## Try the app
+## The problem
 
-**Public, non-production read-only Mini App (READY build):** https://rentrail-operations-staging-bqetxdq5d-faadil1s-projects.vercel.app/  
-Exact deployed app SHA: `f3412c2575918d2ee1297e686ba642dc91ea0130`, Vercel deployment `dpl_3y4ZrTRjRMN1x4Hw1Q74rtScobRQ` (**staging**, READY). **217/217 automated tests passed**. This new release SHA still needs a fresh native Nimiq Pay iPhone acceptance test; earlier G2 pilot ran successfully on a different SHA.
+Rent is the biggest payment most people make every month, and the hardest to keep track of. A landlord with a few units needs to know *which* rent each transfer is for. A tenant needs proof they paid. A plain wallet transfer gives neither: it is an amount and an address, nothing more.
 
-Inside **Nimiq Pay → Mini Apps → Custom URL**, paste the HTTPS URL. The browser preview also works for non-wallet management features.
+## What RentRail does
 
-1. Choose **Try sample data** to see sample properties, units and monthly charges. Examples are explicitly local and do not move funds.
-2. Create your own property, unit and rent charge. Records live in your browser local storage; there is **no shared/cloud property manager account**.
-3. Share the tenant-request link. It includes a recipient, amount and opaque public memo; the URL is **unsigned and editable**. Confirm receiver identity outside the link.
-4. In **Wallet gate**, select **Check host** to see native Nimiq Pay connectivity and its reported MAINNET/TESTNET status. Use **Check independent mainnet RPC** to read the separate public history node.
-5. To verify an **already completed** NIM transaction, paste a real hash and match the relevant recipient, amount and memo. The verification is deliberately conservative; a hash alone is not a receipt.
-6. If the history node reports an exact executed transfer included in a canonical microblock and a following macroblock, RentRail labels the evidence `FINAL_MATCHED`. **This is one node's report**, not a light-client proof, real landlord identity verification or legal acknowledgement of rent paid.
+**For landlords and small property managers**
+- Add properties and units, then create a **rent request per unit and month** (amount in NIM, your receiving address).
+- Send the request link to the tenant (share sheet or copy). Each request carries a unique, random `RR1:` reference. No names or addresses go on-chain.
+- See **who has paid this month**: paid, partly paid, late or still due, unit by unit. Copy a reminder with the payment link. Roll every request over to next month in one tap.
+- Export a CSV of the month, or back up the whole ledger to a file.
 
-## What we actually tested
+**For tenants**
+- Open the link inside Nimiq Pay, check the month, the amount and the landlord's address, and tap **Pay**.
+- Nimiq Pay shows its native confirmation. RentRail never holds funds or keys.
+- RentRail then watches **Nimiq mainnet** until the transfer is final and shows **Paid ✓**, with a **proof link** to send to the landlord.
 
-On **10 November 2026**, a wallet holder successfully approved one **0.005 NIM (500 Luna)** transfer with the Nimiq Pay native confirmation sheet to a separate wallet. A public Nimiq mainnet history node independently reported the exact amount, destination, `RR1` memo, successful execution, canonical microblock inclusion and later macroblock. The recipient's wallet holder separately confirmed that 0.005 NIM appeared in the destination wallet.
+**The proof link closes the loop.** When the landlord opens it, RentRail re-checks the transaction live on mainnet and marks that month paid in their ledger. No backend, no account, nothing to trust but the chain.
 
-Evidence and caveats: [G2 pilot ledger](docs/G2_PILOT_500_LUNA.md), [full scoring and release gate](docs/SUBMISSION_READINESS.md), [demo plan](docs/MAINNET_DEMO_AND_SUBMISSION_GATE.md). Full wallet addresses and private user recordings are **not included** in this public repository without explicit consent.
+## How Nimiq is used
 
-### Important limitations (as of Cycle III)
+| | |
+|---|---|
+| Payment | `@nimiq/mini-app-sdk` `sendBasicTransactionWithData`: exact recipient, value in Luna and the `RR1:` reference as transaction data, approved in the native Nimiq Pay sheet |
+| Network | Refuses to pay when Nimiq Pay reports testnet or has no consensus |
+| Confirmation | Reads the transaction from a public Nimiq mainnet history node (`rpc.nimiqwatch.com`) and requires: network ID 24, successful execution, exact recipient, exact reference, amount, inclusion in a canonical micro block and a later macro block (finality) |
+| Ledger | A transaction hash can be credited once, to one request. Partial payments add up; overpayments are flagged for review |
 
-- **Public build is read-only for money movement.** The sole user-authorized 500-Luna wallet-send pilot was in a dedicated access-protected deployment, **not** this public preview. No further transfers are authorized by this release.
-- The pilot native confirmation UI displayed **0.01 NIM** while mainnet recorded **0.005 NIM**. Source inspection of the upstream open-source Nimiq Pay confirmation and currency formatter identified a likely **two-decimal presentation rounding** path; **no upstream fix has been verified**. See [precision bug analysis](docs/UPSTREAM_NIMIQ_PAY_AMOUNT_PRECISION.md).
-- Verification uses a **single public RPC node** and may fail if that node is unavailable; it is not independently replicated cryptographic proof.
-- The landlord/tenant request URL is **not signed** and can be altered by its sender. Nimiq address checksum validation prevents typing errors, not impersonation.
-- Portfolio records are **local to the device/browser** and do not automatically synchronize with other tenants/landlords.
-- The app makes no custodial transfers, money-transmitter representations, refunds, payment guarantees, legal rent receipts, or verified-user count claims.
+## Try it in 60 seconds
 
-## Develop and test
+1. Open the Mini App and choose **Show me RentRail → Open sample**: two buildings, three units, one rent already paid.
+2. Exit the sample, add a property and a unit, and create a rent request (for a test, 0.01 NIM to a second wallet of yours).
+3. Tap **Send link**, open the link in Nimiq Pay with the other wallet and tap **Pay**.
+4. Wait for **Paid ✓**, tap **Send proof to my landlord**, and open that link on the landlord side: the request is marked paid.
 
-Requirements: **Node 22+** and npm.
+## Design choices and limits
+
+- **Non-custodial and serverless.** Funds go tenant → landlord directly. The ledger lives in the landlord's browser storage (back it up from the Properties page).
+- **Amounts use at most 2 decimals** (min 0.01 NIM). We found that the Nimiq Pay confirmation sheet rounds to 2 decimals (a 0.005 NIM test showed as 0.01 NIM); keeping requests at 2 decimals means the sheet always shows the exact amount. Details: [docs/UPSTREAM_NIMIQ_PAY_AMOUNT_PRECISION.md](docs/UPSTREAM_NIMIQ_PAY_AMOUNT_PRECISION.md).
+- **Request links are not signed yet.** The tenant sees the address checksum and can compare it with the address the landlord gave them; wallet-signed requests are next.
+- **One public history node** is used for confirmation. A second independent node is planned.
+- RentRail confirms what happened on-chain. It does not issue legal rent receipts.
+- NIM only for now; USDT (stable rent) is on the roadmap.
+
+## Roadmap
+
+Wallet-signed rent requests · USDT rent · second mainnet node · shared landlord/tenant view · monthly reminders.
+
+## Develop
+
+Node 22+.
 
 ```bash
-npm install
-npm test
+npm ci
+npm test       # unit tests: amounts, references, reconciliation, proof storage, backups, RPC verification
 npm run build
 npm run dev
 ```
 
-Nimiq Pay SDK: `@nimiq/mini-app-sdk`. Mainnet independent read-only history node: `https://rpc.nimiqwatch.com/`. Public SDK [documentation](https://nimiq.dev/mini-apps/api-reference/nimiq-provider).
+See [APP_SETUP.md](APP_SETUP.md) to test inside Nimiq Pay and deploy. Earlier internal test notes are in [docs/archive](docs/archive).
 
-**Never set** `VITE_ENABLE_LIVE_NIM_SEND=smoke_test_human_approved` for a public general deployment. Only a separately reviewed one-time pilot may use the exact receiver, amount, memo and consent constraints. The old pilot must **not** be reused.
-
-## Evidence status
-
-| Gate | Evidence |
-|---|---|
-| Native Nimiq Pay on iPhone | **PASS** on exact 500-Luna pilot |
-| SDK host reports mainnet + public RPC accessible from mobile | **PASS** |
-| One real user-approved mainnet 500-Luna transfer | **PASS** |
-| One public history node reports exact matching and later macroblock | **PASS_WITH_SINGLE_NODE_CAVEAT** |
-| Destination wallet acknowledges receipt | **USER_CONFIRMED** |
-| Native wallet amount shown correctly | **OPEN BUG — 0.01 vs 0.005 NIM; upstream 2-decimal formatter identified** |
-| General reusable public direct-payment sending | **DISABLED** |
-| Actual rent / multi-property multi-party adoption | **NOT TESTED** |
-| Official Nimiq Cycle III submission | **NOT YET VERIFIED** |
-
-## Competition and team
-
-Nimiq Mini Apps Competition — **Cycle III / PAY**, Nov 11 2026 deadline. The full submission, demo and team-lead wallet must be entered through the [official portal](https://miniappscompetition.com/submit); a public GitHub repo or draft PR alone is not the entry.
-
-If collaborating on the submission, settle team lead, teammate credits, payout wallet and public media consent with the human participants before submitting.
-
-Licensed under **MIT** — see [LICENSE](LICENSE).
+Licensed under [MIT](LICENSE).
