@@ -378,6 +378,32 @@ function walletView():string {
   ${walletInventoryPanel()}
   <div class="safety"><span>${icon('shield')}</span><div><strong>No automatic transfers or custody.</strong><p>Normal previews cannot initiate wallet payment. A dedicated, human-approved capped mainnet test build would additionally require fresh host + public RPC checks and native confirmation. We never request private keys or equate a hash with final settlement.</p></div></div>`;
 }
+function standaloneLookupPanel():string{
+  const status=manualReviewResult ? `<div class="g3-result" id="standalone-result" role="status">
+    <strong>${manualReviewResult.state==='FINAL_MATCHED'?'A public node reports a matching final transfer':escapeHtml(manualReviewResult.state.replaceAll('_',' '))}</strong>
+    <p>${escapeHtml(manualReviewResult.message)}</p>
+    ${manualReviewResult.state==='FINAL_MATCHED'&&typeof manualReviewResult.amountLuna==='number'? `<p>Observed on-chain: <b>${formatNim(manualReviewResult.amountLuna)} NIM</b> (${manualReviewResult.amountLuna} Luna).</p>`:''}
+    <small>${escapeHtml(manualReviewResult.observedAt)} · One public RPC history node, not a legal rent receipt</small>
+    </div>` : '';
+  return `<section class="standalone-verify panel" aria-label="Verify an already-sent Nimiq transaction">
+    <div class="eyebrow">FOR TENANTS AND LANDLORDS · NO ACCOUNT REQUIRED</div>
+    <h2>Already sent NIM? <em>Check what happened.</em></h2>
+    <p>Use the details from your rent request to compare an existing transaction with Nimiq mainnet. RentRail will not ask to send anything or connect a wallet.</p>
+    <form id="standalone-verify-form" class="form-stack" novalidate>
+      <label>1. Transaction hash <input name="hash" type="text" maxlength="64" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="64-character transaction hash" required value="${escapeHtml(manualReviewFields.hash)}" /></label>
+      <label>2. Expected receiving Nimiq address <textarea name="recipient" rows="2" spellcheck="false" autocapitalize="off" placeholder="NQ... receiving address" required>${escapeHtml(manualReviewFields.recipient)}</textarea></label>
+      <div class="form-duo">
+        <label>3. Amount requested (NIM) <input name="amountNim" type="text" inputmode="decimal" placeholder="0.005" required value="${escapeHtml(manualReviewFields.amountNim)}" /></label>
+        <label>4. Rent reference <input name="memo" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="RR1:..." maxlength="36" required value="${escapeHtml(manualReviewFields.memo)}" /></label>
+      </div>
+      <p class="form-hint">All four fields must match. If you received a payment-request link, open it instead to see its expected details. Verify your landlord's address through a separate trusted channel.</p>
+      <button class="primary" type="submit" ${manualReviewBusy?'disabled':''}>${manualReviewBusy?'Reading the blockchain…':'Verify existing payment'} ${icon('arrow')}</button>
+    </form>
+    ${manualReviewMessage?`<div class="inline-alert" role="alert">${escapeHtml(manualReviewMessage)}</div>`:''}
+    ${status}
+    <div class="safety"><span>${icon('shield')}</span><div><strong>No transfer, no custody, no automatic rent receipt.</strong><p>A matching hash is evidence from one public blockchain history node, not proof of who controls the recipient address or whether the lease is settled.</p></div></div>
+  </section>`;
+}
 function g3Panel(p:Portfolio):string {
   const charges = preview ? [] : p.charges;
   const options = charges.map(c=>`<option value="${escapeHtml(c.id)}" ${txChargeId===c.id?'selected':''}>${escapeHtml(c.period)} · ${formatNim(c.amountLuna)} NIM · ${escapeHtml(c.memo.slice(0,13))}…</option>`).join('');
@@ -514,10 +540,10 @@ function independentAuditView(audit:PublicPaymentAudit):string {
 }
 function render():void {
   const p=activePortfolio();
-  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),collections:collectionsView(p),wallet:walletView() + g3Panel(p)})[selectedView];
+  const content=publicAudit?independentAuditView(publicAudit):publicAuditError?`<div class="error-page"><h1>Invalid verification link</h1><p>${escapeHtml(publicAuditError)}</p><a href="/">Back to RentRail</a></div>`:tenantRequest?tenantView(tenantRequest):tenantError?`<div class="error-page"><h1>Invalid request</h1><p>${escapeHtml(tenantError)}</p><a href="/">Back to dashboard</a></div>`:({overview:overview(p),properties:propertiesView(p),charges:chargesView(p),collections:collectionsView(p),wallet:walletView() + standaloneLookupPanel() + g3Panel(p)})[selectedView];
   root!.innerHTML=`<div class="app-shell ${tenantRequest||publicAudit||publicAuditError?'tenant-shell':''}">
     <aside class="sidebar"><a class="brand" href="/"><span class="brand-symbol">R<span>·</span></span><span>rentrail<small>CYCLE III · PAY</small></span></a>
-      <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('collections','Collections','calendar-clock')}${navButton('wallet','Wallet gate','wallet')}</nav>
+      <span class="nav-label">WORKSPACE</span><nav aria-label="Main navigation">${navButton('overview','Overview','home')}${navButton('properties','Properties','building')}${navButton('charges','Rent ledger','receipt')}${navButton('collections','Collections','calendar-clock')}${navButton('wallet','Wallet & proof','wallet')}</nav>
       <div class="sidebar-bottom"><div class="side-note">${icon('shield')}<span>Non-custodial<br/><small>Evidence-first payments</small></span></div><div class="sidebar-footer">CYCLE III · PAY<br/>2026 BUILD</div></div>
     </aside><div class="main-wrap"><header class="topbar"><div class="mobile-brand">R<span>·</span><small>rentrail</small></div><span class="topbar-caption">${publicAudit?'RENT EVIDENCE':tenantRequest?'RENT PAYMENT':selectedView.toUpperCase()}</span><div class="topbar-right"><span class="label-chip">${preview?'EXAMPLE PREVIEW':'LOCAL WORKSPACE'}</span>${walletIndicator()}</div></header>
       <main class="main-content">${preview?`<div class="demo-banner">${icon('alert')} EXAMPLE PREVIEW ONLY — fictional units, no real payments. <button id="exit-preview">Exit preview</button></div>`:''}${content}${toast?`<div class="toast" role="status">${escapeHtml(toast)}</div>`:''}</main>
@@ -535,6 +561,27 @@ function success(message:string):void { toast=message; render(); setTimeout(()=>
 function error(message:string):void { toast=`Notice: ${message}`;render(); }
 function formValue(form:HTMLFormElement,key:string):string { return String(new FormData(form).get(key)||'').trim(); }
 function bindEvents():void {
+  root!.querySelectorAll<HTMLButtonElement>('[data-audience]').forEach(button=>button.addEventListener('click',()=>{
+    const value=button.dataset.audience;
+    if(!validAudience(value))return;
+    audience=value;
+    if(audience!=='explorer')preview=false;
+    try{localStorage.setItem(AUDIENCE_KEY,value);}catch{/* Local preference only. */}
+    selectedView='overview';toast='';render();window.scrollTo(0,0);
+  }));
+  root!.querySelectorAll<HTMLButtonElement>('[data-journey]').forEach(button=>button.addEventListener('click',()=>{
+    const step=journeySteps(audience,preview?emptyPortfolio():activePortfolio(),
+      Object.values(observedProofs).some(p=>p.some(x=>x.status==='FINAL_VERIFIED')))[Number(button.dataset.journey)];
+    if(!step)return;
+    if(step.action==='preview'){audience='explorer';preview=true;selectedView='overview';render();window.scrollTo(0,0);return;}
+    if(step.action==='instructions'){selectedView='overview';render();document.querySelector('#tenant-help')?.scrollIntoView({behavior:'smooth',block:'center'});return;}
+    if(step.action==='view'&&step.view){selectedView=step.view;render();window.scrollTo(0,0);
+      if(audience==='tenant'&&step.view==='wallet')document.querySelector('.standalone-verify')?.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  }));
+  const standaloneForm=root!.querySelector<HTMLFormElement>('#standalone-verify-form');
+  standaloneForm?.addEventListener('submit',e=>{e.preventDefault();void onStandaloneVerify(standaloneForm);});
+  standaloneForm?.addEventListener('input',()=>{manualReviewResult=null;manualReviewMessage='';const card=root!.querySelector('#standalone-result');if(card)card.textContent='Details changed. Run verification again before trusting a previous result.';});
   root!.querySelectorAll<HTMLButtonElement>('[data-nav]').forEach(button=>button.addEventListener('click',()=>{
     selectedView=button.dataset.nav as View; toast=''; render(); window.scrollTo(0,0);
   }));
@@ -692,6 +739,23 @@ async function onRpcCheck():Promise<void>{
   try{rpcNetwork=await checkPublicMainnetRpc();}
   catch{rpcNetwork={state:'NOT_VERIFIED',message:'Public RPC request failed; no chain proof.',observedAt:new Date().toISOString(),rpcUrl:'https://rpc.nimiqwatch.com/'};}
   finally{rpcChecking=false;render();}
+}
+async function onStandaloneVerify(form:HTMLFormElement):Promise<void>{
+  if(manualReviewBusy)return;
+  manualReviewFields={
+    hash:formValue(form,'hash'),
+    recipient:formValue(form,'recipient'),
+    memo:formValue(form,'memo'),
+    amountNim:formValue(form,'amountNim'),
+  };
+  manualReviewResult=null;manualReviewMessage='';
+  let input;
+  try{input=parseManualPaymentReview(manualReviewFields);}
+  catch(err){manualReviewMessage=err instanceof Error?err.message:'Invalid payment details.';render();return;}
+  manualReviewBusy=true;render();
+  try{manualReviewResult=await verifyNimTransaction(input);}
+  catch{manualReviewMessage='The read-only node could not complete the check. No amount is credited.';}
+  finally{manualReviewBusy=false;render();}
 }
 async function onVerifyG3(form:HTMLFormElement):Promise<void>{
   if(txVerifyBusy||preview)return;
