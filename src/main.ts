@@ -1,4 +1,5 @@
 import './styles.css';
+import {compareIndependentRecipient} from './recipient-crosscheck.ts';
 import { monthSnapshot, nextMonth, planNextPeriod } from './operations.ts';
 import { journeySteps,validAudience,parseManualPaymentReview,describeManualProof,statusExplanations,type Audience,type ManualPaymentReviewFields } from './journey.ts';
 import { collectionQueue,collectionCsv,reminderDraft,validDueDay,type DueDays } from './collections.ts';
@@ -77,6 +78,7 @@ let txChargeId = '';
 let txVerifiedChargeId = '';
 let toast = '';
 let tenantRequest: SharedRequest | null = null;
+let tenantRecipientComparison='';
 let tenantError = '';
 // Preview is host-connection-only. Never send NIM until a reviewed verifier and human gate exist.
 // NEVER enabled in ordinary staging. Separate explicit human approval is required
@@ -481,6 +483,10 @@ function tenantView(request:SharedRequest):string {
     <div class="detail"><span>Public memo</span><strong class="mono">${escapeHtml(request.memo)}</strong></div>
     <div class="detail"><span>Reference</span><strong class="mono">${escapeHtml(request.chargeId.slice(0,10))}…</strong></div>
     <div class="inline-alert">${icon('alert')} Link contents can be altered by anyone sharing it. Verify the recipient with your landlord independently. This request does not prove identity or a legal debt.</div>
+    <section class="panel" aria-label="Recipient address cross-check"><h2>Compare the recipient address</h2><p class="form-hint">Use the Nimiq receiving address your landlord told you through another trusted channel, not the address copied from this link. This comparison is local and does not send funds.</p>
+      <form id="recipient-crosscheck-form" class="form-stack"><label>Independently confirmed NQ address<textarea name="confirmedRecipient" rows="2" maxlength="80" spellcheck="false" autocomplete="off" required placeholder="NQ..."></textarea></label><button class="tertiary" type="submit">Compare addresses</button></form>
+      ${tenantRecipientComparison?`<div role="status" class="inline-alert">${escapeHtml(tenantRecipientComparison)}</div>`:''}
+    </section>
     ${!paymentEnabled?`<section class="tenant-readonly-steps" aria-label="Understand this rent request"><h2>What should I do next?</h2>
       <div class="tenant-readonly-list"><div><b>1 · Check the request</b><p>Confirm the month and the NIM amount. Compare the receiving address with your landlord through another trusted channel.</p></div>
       <div><b>2 · Already paid?</b><p>Find the public transaction hash in your wallet. Use the form below to check the exact amount, receiver and RR1 reference on mainnet.</p></div>
@@ -675,6 +681,16 @@ function bindEvents():void {
       else window.prompt('Copy and review reminder draft before sending',draft);
     }catch{window.prompt('Copy and review reminder draft before sending',draft);}
   }));
+  root!.querySelector('#recipient-crosscheck-form')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!tenantRequest)return;
+    const form=e.target as HTMLFormElement;
+    const check=compareIndependentRecipient(tenantRequest.recipient,formValue(form,'confirmedRecipient'));
+    tenantRecipientComparison=check.message;
+    const note=root!.querySelector('.checkout-card [aria-label="Recipient address cross-check"] [role="status"]');
+    if(note)note.textContent=check.message;
+    else{const panel=root!.querySelector('.checkout-card [aria-label="Recipient address cross-check"]');if(panel){const p=document.createElement('p');p.className='inline-alert';p.setAttribute('role','status');p.textContent=check.message;panel.appendChild(p);}}
+  });
   root!.querySelector('#tenant-proof-form')?.addEventListener('submit',e=>{
     e.preventDefault();
     const form=e.target as HTMLFormElement;
