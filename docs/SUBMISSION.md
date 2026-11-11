@@ -8,19 +8,19 @@
 
 ## Description (under 250 words)
 
-Stub turns rent into a monthly flow that only Nimiq Pay makes possible.
+Stub is the rent book, on-chain. Each monthly payment leaves a stub the tenant can keep and the landlord can check.
 
-There are no accounts: landlords and tenants sign in with their Nimiq Pay wallets. A landlord adds properties and units, then signs a monthly lease once with their wallet. Stub creates each month's request, with a unique STUB1 reference that travels in the Nimiq transaction itself.
+Inside Nimiq Pay, a landlord creates a property and a unit, then prepares a one-time rent request or a wallet-signed recurring lease. The monthly STUB1 reference travels with the NIM transaction, linking each transfer to the right month without exposing tenants' names on-chain.
 
-The tenant opens the link in Nimiq Pay. Stub verifies the landlord's signature: a modified link blocks payment, and a new receiving address triggers a warning. The tenant taps Pay and approves in the native Nimiq Pay sheet. Stub never holds funds or keys. It then confirms the transfer on Nimiq mainnet (recipient, amount, reference, execution, finality) and shows Paid, a PDF receipt with QR code, and a proof signed by the tenant's wallet.
+The tenant opens a receipt-style payment link, sees the amount, receiving wallet and a signature check, then approves the payment in the native Nimiq Pay interface. Stub never controls funds or private keys.
 
-The landlord's ledger detects incoming payments automatically, matches them to each unit and month, and shows who paid, who partly paid and who is late. Each payment counts once; payments from an unknown wallet are flagged. Every new month appears on both sides without a new link.
+Afterward, Stub queries a public Nimiq mainnet history node for transaction execution, recipient, exact reference, amount and finality. The landlord can search recent incoming transfers to reconcile payments with the local rent ledger. A paper-inspired printable record and QR link let anyone recheck the public payment.
 
-Non-custodial and serverless: data stays on each device, with backup export.
+The signer of a wallet-signed claim is identified as the claim signer, not necessarily the blockchain sender. Similarly, a signed request verifies the receiving wallet key, not a landlord's legal identity. Stub uses local browser storage with backup export; history discovery is bounded and relies on one public node.
 
-While testing, we found that the Nimiq Pay confirmation sheet rounds amounts to 2 decimals, so Stub keeps every request at 2 decimals.
+Designed for rent that returns every month.
 
-For landlords, small property managers and tenants who pay rent every month.
+_Word count: 199._
 
 ## Before submitting (human)
 
