@@ -860,7 +860,7 @@ function bindEvents():void {
   });
   root!.querySelector('#export-backup')?.addEventListener('click',()=>{
     if(preview)return;
-    downloadFile('rentrail-backup-'+localDay()+'.json',createBackup(portfolio,storedProofs,dueDays),'application/json');
+    downloadFile('rentrail-backup-'+localDay()+'.json',createBackup(portfolio,storedProofs,dueDays,new Date(),leases,unitTenants),'application/json');
     success('Backup exported. Keep the file somewhere safe.');
   });
   root!.querySelector<HTMLInputElement>('#import-backup')?.addEventListener('change',async e=>{
@@ -872,6 +872,7 @@ function bindEvents():void {
       savePortfolio(restored.portfolio);portfolio=restored.portfolio;
       persistProofs(restored.proofs);
       localStorage.setItem(DUE_STORAGE_KEY,JSON.stringify(restored.dueDays));dueDays=restored.dueDays;
+      saveLeases(restored.leases);saveUnitTenants(restored.unitTenants);
       success('Backup restored.');
     }catch(err){error(err instanceof Error?err.message:'Could not restore this file.');}
   });
